@@ -19,6 +19,7 @@ export type Database = {
                     planned_end: string
                     planned_start: string
                     stop_condition: string | null
+                    task_id: string | null
                     task_link: string | null
                     title: string
                     type: string | null
@@ -33,6 +34,7 @@ export type Database = {
                     planned_end: string
                     planned_start: string
                     stop_condition?: string | null
+                    task_id?: string | null
                     task_link?: string | null
                     title: string
                     type?: string | null
@@ -47,6 +49,7 @@ export type Database = {
                     planned_end?: string
                     planned_start?: string
                     stop_condition?: string | null
+                    task_id?: string | null
                     task_link?: string | null
                     title?: string
                     type?: string | null
@@ -58,6 +61,13 @@ export type Database = {
                         columns: ["goal_id"]
                         isOneToOne: false
                         referencedRelation: "goals"
+                        referencedColumns: ["id"]
+                    },
+                    {
+                        foreignKeyName: "blocks_task_id_fkey"
+                        columns: ["task_id"]
+                        isOneToOne: false
+                        referencedRelation: "tasks"
                         referencedColumns: ["id"]
                     },
                 ]
@@ -104,6 +114,8 @@ export type Database = {
                     horizon: string | null
                     id: string
                     linear_issue_id: string | null
+                    linear_sync_status: string | null
+                    linear_synced_at: string | null
                     priority: number | null
                     source: string | null
                     title: string
@@ -115,6 +127,8 @@ export type Database = {
                     horizon: string
                     id?: string
                     linear_issue_id?: string | null
+                    linear_sync_status?: string | null
+                    linear_synced_at?: string | null
                     priority?: number | null
                     source?: string | null
                     title: string
@@ -126,6 +140,8 @@ export type Database = {
                     horizon?: string
                     id?: string
                     linear_issue_id?: string | null
+                    linear_sync_status?: string | null
+                    linear_synced_at?: string | null
                     priority?: number | null
                     source?: string | null
                     title?: string
@@ -181,6 +197,71 @@ export type Database = {
                     },
                 ]
             }
+            tasks: {
+                Row: {
+                    created_at: string | null
+                    description: string | null
+                    domain: string | null
+                    due_date: string | null
+                    estimate: number | null
+                    id: string
+                    linear_identifier: string | null
+                    linear_issue_id: string
+                    linear_synced_at: string | null
+                    parent_id: string | null
+                    priority: number | null
+                    state: string | null
+                    task_type: string | null
+                    title: string
+                    updated_at: string | null
+                    user_id: string
+                }
+                Insert: {
+                    created_at?: string | null
+                    description?: string | null
+                    domain?: string | null
+                    due_date?: string | null
+                    estimate?: number | null
+                    id?: string
+                    linear_identifier?: string | null
+                    linear_issue_id: string
+                    linear_synced_at?: string | null
+                    parent_id?: string | null
+                    priority?: number | null
+                    state?: string | null
+                    task_type?: string | null
+                    title: string
+                    updated_at?: string | null
+                    user_id: string
+                }
+                Update: {
+                    created_at?: string | null
+                    description?: string | null
+                    domain?: string | null
+                    due_date?: string | null
+                    estimate?: number | null
+                    id?: string
+                    linear_identifier?: string | null
+                    linear_issue_id?: string
+                    linear_synced_at?: string | null
+                    parent_id?: string | null
+                    priority?: number | null
+                    state?: string | null
+                    task_type?: string | null
+                    title?: string
+                    updated_at?: string | null
+                    user_id?: string
+                }
+                Relationships: [
+                    {
+                        foreignKeyName: "tasks_parent_id_fkey"
+                        columns: ["parent_id"]
+                        isOneToOne: false
+                        referencedRelation: "tasks"
+                        referencedColumns: ["id"]
+                    },
+                ]
+            }
         }
         Views: {
             [_ in never]: never
@@ -207,14 +288,19 @@ export type Goal = Tables<'goals'>
 export type Block = Tables<'blocks'>
 export type Session = Tables<'sessions'>
 export type DailyMetric = Tables<'daily_metrics'>
+export type Task = Tables<'tasks'>
 
 // Insert type aliases
 export type InsertGoal = InsertTables<'goals'>
 export type InsertBlock = InsertTables<'blocks'>
 export type InsertSession = InsertTables<'sessions'>
 export type InsertDailyMetric = InsertTables<'daily_metrics'>
+export type InsertTask = InsertTables<'tasks'>
 
-// Block type enum for type safety
+// Type enums for type safety
 export type BlockType = 'focus' | 'admin' | 'recovery'
 export type Horizon = 'year' | 'quarter' | 'week'
 export type SessionOutcome = 'done' | 'aborted' | 'continue'
+export type TaskType = 'task' | 'routine' | 'goal'
+export type Domain = 'health' | 'career' | 'learning' | 'life'
+export type TaskState = 'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done' | 'canceled'
