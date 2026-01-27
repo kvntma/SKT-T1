@@ -2,7 +2,8 @@
 
 import { useCurrentBlock } from '@/lib/hooks/useCurrentBlock'
 import { useExecutionStore } from '@/lib/stores/execution-store'
-import { useEffect, useState } from 'react'
+import { useSession } from '@/lib/hooks/useSession'
+import { useEffect, useState, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -35,7 +36,10 @@ function getBlockTypeColor(type: string): string {
 export default function NowPage() {
     const { data: currentBlock, isLoading } = useCurrentBlock()
     const { isRunning, elapsedSeconds, startTimer, stopTimer, tick, setCurrentBlock } = useExecutionStore()
+    const { startSession, endSession } = useSession()
     const [mounted, setMounted] = useState(false)
+    const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
+    const blockStartTimeRef = useRef<Date | null>(null)
 
     useEffect(() => {
         setMounted(true)
@@ -44,6 +48,10 @@ export default function NowPage() {
     useEffect(() => {
         if (currentBlock) {
             setCurrentBlock(currentBlock)
+            // Track when the block becomes current for TTS calculation
+            if (!blockStartTimeRef.current) {
+                blockStartTimeRef.current = new Date(currentBlock.planned_start)
+            }
         }
     }, [currentBlock, setCurrentBlock])
 
@@ -104,18 +112,42 @@ export default function NowPage() {
         (new Date(currentBlock.planned_end).getTime() - new Date(currentBlock.planned_start).getTime()) / 60000
     )
 
-    const handleStart = () => {
-        startTimer()
+    const handleStart = async () => {
+        if (!currentBlock) return
+
+        // Calculate time-to-start (seconds since block started)
+        const now = new Date()
+        const blockStart = new Date(currentBlock.planned_start)
+        const timeToStart = Math.max(0, Math.floor((now.getTime() - blockStart.getTime()) / 1000))
+
+        try {
+            const session = await startSession.mutateAsync({
+                blockId: currentBlock.id,
+                timeToStart,
+            })
+            setCurrentSessionId(session.id)
+            startTimer()
+        } catch (error) {
+            console.error('Failed to start session:', error)
+        }
     }
 
     const handleDone = () => {
         stopTimer()
-        window.location.href = '/save?outcome=done'
+        if (currentSessionId) {
+            window.location.href = `/save?outcome=done&sessionId=${currentSessionId}`
+        } else {
+            window.location.href = '/save?outcome=done'
+        }
     }
 
     const handleStop = () => {
         stopTimer()
-        window.location.href = '/save?outcome=aborted'
+        if (currentSessionId) {
+            window.location.href = `/save?outcome=aborted&sessionId=${currentSessionId}`
+        } else {
+            window.location.href = '/save?outcome=aborted'
+        }
     }
 
     // Calculate progress for the ring
@@ -148,7 +180,7 @@ export default function NowPage() {
                                 <h2 className="truncate text-lg font-semibold text-white">
                                     {currentBlock.title}
                                 </h2>
-                                <div className="mt-2 flex items-center gap-2">
+                                <div className="mt-2 flex flex-wrap items-center gap-2">
                                     <Badge
                                         variant="outline"
                                         className={cn("text-xs font-medium", getBlockTypeColor(currentBlock.type))}
@@ -159,8 +191,58 @@ export default function NowPage() {
                                         {blockDurationMinutes} min
                                     </span>
                                 </div>
+
+                                {/* Time Range */}
+                                <div className="mt-3 flex items-center gap-1.5 text-xs text-zinc-500">
+                                    <span>🕐</span>
+                                    <span>
+                                        {new Date(currentBlock.planned_start).toLocaleTimeString('en-US', {
+                                            hour: 'numeric',
+                                            minute: '2-digit',
+                                            hour12: true
+                                        })}
+                                        {' → '}
+                                        {new Date(currentBlock.planned_end).toLocaleTimeString('en-US', {
+                                            hour: 'numeric',
+                                            minute: '2-digit',
+                                            hour12: true
+                                        })}
+                                    </span>
+                                </div>
                             </div>
                         </div>
+
+                        {/* Quick Links */}
+                        {(currentBlock.task_link || currentBlock.linear_issue_id || currentBlock.calendar_id) && (
+                            <div className="mt-4 flex flex-wrap gap-2 border-t border-zinc-800 pt-4">
+                                {currentBlock.task_link && (
+                                    <a
+                                        href={currentBlock.task_link}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-500/10 px-3 py-1.5 text-xs font-medium text-indigo-400 ring-1 ring-indigo-500/20 transition-colors hover:bg-indigo-500/20"
+                                    >
+                                        <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor">
+                                            <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z" />
+                                        </svg>
+                                        {currentBlock.linear_issue_id || 'Linear'}
+                                    </a>
+                                )}
+                                {currentBlock.calendar_id && (
+                                    <a
+                                        href={`https://calendar.google.com/calendar/event?eid=${currentBlock.calendar_id}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1.5 rounded-lg bg-blue-500/10 px-3 py-1.5 text-xs font-medium text-blue-400 ring-1 ring-blue-500/20 transition-colors hover:bg-blue-500/20"
+                                    >
+                                        <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor">
+                                            <path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zM9 14H7v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2zm-8 4H7v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2z" />
+                                        </svg>
+                                        Calendar
+                                    </a>
+                                )}
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
 

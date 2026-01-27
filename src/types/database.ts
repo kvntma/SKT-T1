@@ -262,6 +262,51 @@ export type Database = {
                     },
                 ]
             }
+            profiles: {
+                Row: {
+                    id: string
+                    full_name: string | null
+                    avatar_url: string | null
+                    google_calendar_connected: boolean | null
+                    google_calendar_token: string | null
+                    google_calendar_refresh_token: string | null
+                    google_calendar_token_expires: string | null
+                    selected_calendar_id: string | null
+                    synced_calendar_ids: string[] | null
+                    created_at: string | null
+                    updated_at: string | null
+                    last_calendar_sync: string | null
+                }
+                Insert: {
+                    id: string
+                    full_name?: string | null
+                    avatar_url?: string | null
+                    google_calendar_connected?: boolean | null
+                    google_calendar_token?: string | null
+                    google_calendar_refresh_token?: string | null
+                    google_calendar_token_expires?: string | null
+                    selected_calendar_id?: string | null
+                    synced_calendar_ids?: string[] | null
+                    created_at?: string | null
+                    updated_at?: string | null
+                    last_calendar_sync?: string | null
+                }
+                Update: {
+                    id?: string
+                    full_name?: string | null
+                    avatar_url?: string | null
+                    google_calendar_connected?: boolean | null
+                    google_calendar_token?: string | null
+                    google_calendar_refresh_token?: string | null
+                    google_calendar_token_expires?: string | null
+                    selected_calendar_id?: string | null
+                    synced_calendar_ids?: string[] | null
+                    created_at?: string | null
+                    updated_at?: string | null
+                    last_calendar_sync?: string | null
+                }
+                Relationships: []
+            }
         }
         Views: {
             [_ in never]: never
@@ -289,6 +334,7 @@ export type Block = Tables<'blocks'>
 export type Session = Tables<'sessions'>
 export type DailyMetric = Tables<'daily_metrics'>
 export type Task = Tables<'tasks'>
+export type Profile = Tables<'profiles'>
 
 // Insert type aliases
 export type InsertGoal = InsertTables<'goals'>
@@ -298,7 +344,7 @@ export type InsertDailyMetric = InsertTables<'daily_metrics'>
 export type InsertTask = InsertTables<'tasks'>
 
 // Type enums for type safety
-export type BlockType = 'focus' | 'admin' | 'recovery'
+export type BlockType = 'focus' | 'admin' | 'recovery' | 'busy'
 export type Horizon = 'year' | 'quarter' | 'week'
 export type SessionOutcome = 'done' | 'aborted' | 'continue'
 export type TaskType = 'task' | 'routine' | 'goal'
