@@ -5,6 +5,7 @@ interface ExecutionStore extends ExecutionState {
     setCurrentBlock: (block: Block | undefined) => void
     startTimer: () => void
     stopTimer: () => void
+    resumeTimer: () => void
     tick: () => void
     reset: () => void
 }
@@ -27,6 +28,11 @@ export const useExecutionStore = create<ExecutionStore>((set) => ({
     stopTimer: () =>
         set({
             isRunning: false,
+        }),
+
+    resumeTimer: () =>
+        set({
+            isRunning: true,
         }),
 
     tick: () =>

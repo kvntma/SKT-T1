@@ -1,41 +1,48 @@
 # Current Work Memory
-Last updated: 2026-01-28 00:45 local
+Last updated: 2026-01-28 01:51 EST
 
-Ticket: SKT-18
+Ticket: SKT-19
 Branch: master
 
 ## Summary
-**SKT-18 Implementation Complete**
-- Implemented customizable block source colors for "Push To Start" (manual) blocks only.
-- Calendar-synced blocks now use their actual Google Calendar color (hex) instead of a user preference.
-- Created `AppearanceSection` in Settings with color swatch picker for manual blocks + info note about calendar colors.
-- Updated `blocks/page.tsx` and `calendar-view.tsx` with inline style logic for calendar blocks.
+- Implemented undo-able Stop button with 5-second countdown modal
+- Added hybrid data safety approach: session marked as `abandoned` immediately on Stop click
+- Fixed cache invalidation bug: `endSession` wasn't invalidating `['blocks']` query
+- Added `resumeTimer()` to execution store to preserve elapsed time during undo
+- Added red "Confirm Stop" button for immediate navigation
+- Updated Supabase DB constraint to include `abandoned` outcome
+- Standardized cache invalidation across all mutations (blocks, sessions, currentBlock)
 
 ## Decisions (Do Not Re-litigate)
-- **Manual Blocks:** Use customizable Tailwind color class via `getBlockColorClass()`.
-- **Calendar Blocks:** Use actual calendar hex color via inline `borderLeftColor` style.
-- **Status Priority:** "Missed" status (Amber) always overrides source color.
-- **Tailwind JIT:** Use static lookup map for Tailwind classes (never interpolate).
+- **Undo Toast over Confirmation Dialog**: Less friction for intentional stops, safety for accidents
+- **Hybrid Abandon Pattern**: Write `outcome: 'abandoned'` immediately on Stop → data safe even if user closes tab
+- **Centered Modal**: Undo overlay centered on screen to avoid being hidden by bottom nav
+- **`resumeTimer()` vs `startTimer()`**: `resumeTimer` doesn't reset `elapsedSeconds`, allowing undo to continue from paused time
 
 ## Current State
-- `master` branch has all SKT-18 changes ready for commit.
-- Settings > Appearance section shows manual block color picker + calendar color info.
-- Block list and Calendar views correctly apply:
-  - User's color preference for manual blocks
-  - Actual Google Calendar color for synced blocks
+- `/now` page has full undo-able stop flow with 5-second countdown
+- `useSession` hook exports: `startSession`, `abandonSession`, `resumeSession`, `endSession`
+- `execution-store` exports: `startTimer`, `stopTimer`, `resumeTimer`, `tick`, `reset`, `setCurrentBlock`
+- Block status logic recognizes `abandoned` → shows as "Stopped (Unsaved)"
+- All mutations (create/delete block, start/abandon/resume/end session) invalidate `['blocks']`, `['currentBlock']`, `['sessions']`
 
-## Pre-existing Issues (Not SKT-18)
-- `blocks/[id]/page.tsx` has type errors related to `status` property — needs separate fix.
+## Open Questions / Risks
+- None for SKT-19; feature complete pending testing
 
 ## Next Steps
-- [ ] Test in browser (Settings → Blocks → Calendar View)
-- [ ] Commit changes with descriptive message
-- [ ] Mark SKT-18 as Done in Linear
+- [ ] Test full undo-stop flow: Start session → Stop → Undo → verify timer resumes
+- [ ] Test confirm flow: Start session → Stop → Confirm Stop → verify save page loads
+- [ ] Test abandon recovery: Start session → Stop → close browser → verify block shows "Stopped (Unsaved)"
+- [ ] Commit changes: `git add -A && git commit -m "feat(now): add undo-able stop with hybrid data safety (SKT-19)"`
+- [ ] Mark SKT-19 as Done in Linear
 
 ## References
-- Ticket: [SKT-18](https://linear.app/hanwha-life/issue/SKT-18/settings-customizable-block-source-colors)
-- Files Modified:
-  - `src/app/(app)/settings/page.tsx` — AppearanceSection (manual color only)
-  - `src/app/(app)/blocks/page.tsx` — Dynamic color via inline style for calendar blocks
-  - `src/components/calendar-view.tsx` — Dynamic color via inline style + calendars prop
-  - `src/lib/hooks/useBlockColorPreferences.ts` — getBlockColorClass helper
+- Ticket: https://linear.app/skt-t1/issue/SKT-19
+- PR: N/A (direct commit to master)
+- Files:
+  - src/app/(app)/now/page.tsx (undo modal, handlers)
+  - src/lib/hooks/useSession.ts (abandonSession, resumeSession mutations)
+  - src/lib/hooks/useBlocks.ts (cache invalidation)
+  - src/lib/stores/execution-store.ts (resumeTimer)
+  - src/lib/blocks/config.ts (abandoned status handling)
+  - src/types/index.ts (Session outcome type)

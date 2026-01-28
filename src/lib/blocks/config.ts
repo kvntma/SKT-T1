@@ -202,6 +202,16 @@ export function getBlockStatus(
         }
     }
 
+    if (session?.outcome === 'abandoned') {
+        return {
+            status: 'stopped',
+            label: 'Stopped (Unsaved)',
+            canStart: false,
+            canSkip: false,
+            showsInStats: true,
+        }
+    }
+
     // Has started but no outcome yet = active
     if (session?.actual_start) {
         return {

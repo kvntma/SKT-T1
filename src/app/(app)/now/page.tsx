@@ -38,13 +38,19 @@ function getBlockTypeColor(type: string): string {
 export default function NowPage() {
     const { data: currentBlock, isLoading: currentBlockLoading } = useCurrentBlock()
     const { blocks, isLoading: blocksLoading } = useBlocks()
-    const { isRunning, elapsedSeconds, startTimer, stopTimer, tick, setCurrentBlock } = useExecutionStore()
-    const { startSession, endSession } = useSession()
+    const { isRunning, elapsedSeconds, startTimer, stopTimer, resumeTimer, tick, setCurrentBlock } = useExecutionStore()
+    const { startSession, abandonSession, resumeSession, endSession } = useSession()
     const [mounted, setMounted] = useState(false)
     const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
     const blockStartTimeRef = useRef<Date | null>(null)
     const [overrideBlock, setOverrideBlock] = useState<Block | null>(null)
     const [autoStartTriggered, setAutoStartTriggered] = useState(false)
+
+    // Undo stop functionality
+    const [pendingStop, setPendingStop] = useState(false)
+    const [undoCountdown, setUndoCountdown] = useState(5)
+    const undoTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+    const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
     // The block to display - prefer override (from blocks page), fallback to current
     const activeBlock = overrideBlock || currentBlock
@@ -176,7 +182,72 @@ export default function NowPage() {
     }
 
     const handleStop = () => {
+        // Stop timer immediately for visual feedback
         stopTimer()
+        setPendingStop(true)
+        setUndoCountdown(5)
+
+        // Immediately mark session as abandoned in DB (data safety)
+        if (currentSessionId) {
+            abandonSession.mutate({ sessionId: currentSessionId })
+        }
+
+        // Start countdown interval
+        countdownIntervalRef.current = setInterval(() => {
+            setUndoCountdown(prev => {
+                if (prev <= 1) {
+                    return 0
+                }
+                return prev - 1
+            })
+        }, 1000)
+
+        // Set timeout to finalize stop after 5 seconds
+        undoTimeoutRef.current = setTimeout(() => {
+            if (countdownIntervalRef.current) {
+                clearInterval(countdownIntervalRef.current)
+            }
+            // Navigate to save page
+            if (currentSessionId) {
+                window.location.href = `/save?outcome=aborted&sessionId=${currentSessionId}`
+            } else {
+                window.location.href = '/save?outcome=aborted'
+            }
+        }, 5000)
+    }
+
+    const handleUndoStop = () => {
+        // Cancel the pending stop
+        if (undoTimeoutRef.current) {
+            clearTimeout(undoTimeoutRef.current)
+            undoTimeoutRef.current = null
+        }
+        if (countdownIntervalRef.current) {
+            clearInterval(countdownIntervalRef.current)
+            countdownIntervalRef.current = null
+        }
+
+        // Clear abandoned status in DB
+        if (currentSessionId) {
+            resumeSession.mutate({ sessionId: currentSessionId })
+        }
+
+        // Resume the session
+        setPendingStop(false)
+        setUndoCountdown(5)
+        resumeTimer() // Resume timer from where we left off
+    }
+
+    const handleConfirmStop = () => {
+        // Clear timers and navigate immediately
+        if (undoTimeoutRef.current) {
+            clearTimeout(undoTimeoutRef.current)
+        }
+        if (countdownIntervalRef.current) {
+            clearInterval(countdownIntervalRef.current)
+        }
+
+        // Navigate to save page immediately
         if (currentSessionId) {
             window.location.href = `/save?outcome=aborted&sessionId=${currentSessionId}`
         } else {
@@ -327,13 +398,22 @@ export default function NowPage() {
 
                 {/* Action Buttons */}
                 <div className="flex w-full gap-3">
-                    {!isRunning ? (
+                    {!isRunning && !pendingStop ? (
                         <Button
                             onClick={handleStart}
                             size="lg"
                             className="h-14 flex-1 bg-emerald-600 text-lg font-semibold hover:bg-emerald-500"
                         >
                             START
+                        </Button>
+                    ) : pendingStop ? (
+                        <Button
+                            size="lg"
+                            variant="outline"
+                            disabled
+                            className="h-14 flex-1 text-lg font-semibold opacity-50"
+                        >
+                            Stopping...
                         </Button>
                     ) : (
                         <>
@@ -387,6 +467,42 @@ export default function NowPage() {
                     Block ID: {activeBlock?.id || 'none'}
                 </p>
             </div>
+
+            {/* Undo Stop Toast */}
+            {pendingStop && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="flex flex-col items-center gap-4 rounded-2xl bg-zinc-900 px-6 py-5 shadow-2xl ring-1 ring-zinc-700/50">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-500/20 text-amber-400">
+                            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                        </div>
+                        <div className="flex flex-col items-center text-center">
+                            <span className="text-lg font-semibold text-white">Session Stopped</span>
+                            <span className="mt-1 text-sm text-zinc-400">
+                                Saving in {undoCountdown} seconds...
+                            </span>
+                        </div>
+                        <div className="mt-2 flex w-full gap-3">
+                            <Button
+                                onClick={handleUndoStop}
+                                size="lg"
+                                className="h-12 flex-1 bg-emerald-600 text-base font-semibold hover:bg-emerald-500"
+                            >
+                                Undo
+                            </Button>
+                            <Button
+                                onClick={handleConfirmStop}
+                                size="lg"
+                                variant="destructive"
+                                className="h-12 flex-1 text-base font-semibold"
+                            >
+                                Confirm Stop
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

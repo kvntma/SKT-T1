@@ -16,6 +16,10 @@ interface EndSessionParams {
     resumeToken?: string
 }
 
+interface AbandonSessionParams {
+    sessionId: string
+}
+
 export function useSession() {
     const supabase = createClient()
     const queryClient = useQueryClient()
@@ -44,6 +48,51 @@ export function useSession() {
         },
     })
 
+    // Mark session as abandoned (user clicked Stop but hasn't saved yet)
+    const abandonSession = useMutation({
+        mutationFn: async ({ sessionId }: AbandonSessionParams) => {
+            const { data, error } = await supabase
+                .from('sessions')
+                .update({
+                    outcome: 'abandoned',
+                })
+                .eq('id', sessionId)
+                .select()
+                .single()
+
+            if (error) throw error
+            return data as Session
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['sessions'] })
+            queryClient.invalidateQueries({ queryKey: ['blocks'] })
+            queryClient.invalidateQueries({ queryKey: ['currentBlock'] })
+        },
+    })
+
+    // Resume session (user clicked Undo after Stop)
+    const resumeSession = useMutation({
+        mutationFn: async ({ sessionId }: AbandonSessionParams) => {
+            const { data, error } = await supabase
+                .from('sessions')
+                .update({
+                    outcome: null, // Clear the abandoned status
+                })
+                .eq('id', sessionId)
+                .select()
+                .single()
+
+            if (error) throw error
+            return data as Session
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['sessions'] })
+            queryClient.invalidateQueries({ queryKey: ['blocks'] })
+            queryClient.invalidateQueries({ queryKey: ['currentBlock'] })
+        },
+    })
+
+    // Finalize session with outcome and reason
     const endSession = useMutation({
         mutationFn: async ({ sessionId, outcome, abortReason, resumeToken }: EndSessionParams) => {
             const { data, error } = await supabase
@@ -63,11 +112,15 @@ export function useSession() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['sessions'] })
+            queryClient.invalidateQueries({ queryKey: ['blocks'] })
+            queryClient.invalidateQueries({ queryKey: ['currentBlock'] })
         },
     })
 
     return {
         startSession,
+        abandonSession,
+        resumeSession,
         endSession,
     }
 }

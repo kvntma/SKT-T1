@@ -34,7 +34,7 @@ export interface Session {
     block_id?: string
     actual_start?: string
     actual_end?: string
-    outcome?: 'done' | 'aborted' | 'continue'
+    outcome?: 'done' | 'aborted' | 'continue' | 'abandoned'
     abort_reason?: string
     resume_token?: string // "What's the next obvious step?"
     time_to_start?: number // Seconds between block start and session start

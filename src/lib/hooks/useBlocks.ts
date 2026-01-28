@@ -90,6 +90,7 @@ export function useBlocks(view: BlockView = 'today') {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['blocks'] })
             queryClient.invalidateQueries({ queryKey: ['currentBlock'] })
+            queryClient.invalidateQueries({ queryKey: ['sessions'] })
         },
     })
 
@@ -106,6 +107,7 @@ export function useBlocks(view: BlockView = 'today') {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['blocks'] })
             queryClient.invalidateQueries({ queryKey: ['currentBlock'] })
+            queryClient.invalidateQueries({ queryKey: ['sessions'] })
         },
     })
 
