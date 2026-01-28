@@ -14,6 +14,7 @@ export type Database = {
                     calendar_id: string | null
                     created_at: string | null
                     goal_id: string | null
+                    google_event_id: string | null
                     id: string
                     linear_issue_id: string | null
                     planned_end: string
@@ -29,6 +30,7 @@ export type Database = {
                     calendar_id?: string | null
                     created_at?: string | null
                     goal_id?: string | null
+                    google_event_id?: string | null
                     id?: string
                     linear_issue_id?: string | null
                     planned_end: string
@@ -44,6 +46,7 @@ export type Database = {
                     calendar_id?: string | null
                     created_at?: string | null
                     goal_id?: string | null
+                    google_event_id?: string | null
                     id?: string
                     linear_issue_id?: string | null
                     planned_end?: string
@@ -273,6 +276,9 @@ export type Database = {
                     google_calendar_token_expires: string | null
                     selected_calendar_id: string | null
                     synced_calendar_ids: string[] | null
+                    push_calendar_id: string | null
+                    manual_block_color: string | null
+                    calendar_block_color: string | null
                     created_at: string | null
                     updated_at: string | null
                     last_calendar_sync: string | null
@@ -287,6 +293,7 @@ export type Database = {
                     google_calendar_token_expires?: string | null
                     selected_calendar_id?: string | null
                     synced_calendar_ids?: string[] | null
+                    push_calendar_id?: string | null
                     created_at?: string | null
                     updated_at?: string | null
                     last_calendar_sync?: string | null
@@ -301,6 +308,9 @@ export type Database = {
                     google_calendar_token_expires?: string | null
                     selected_calendar_id?: string | null
                     synced_calendar_ids?: string[] | null
+                    push_calendar_id?: string | null
+                    manual_block_color?: string | null
+                    calendar_block_color?: string | null
                     created_at?: string | null
                     updated_at?: string | null
                     last_calendar_sync?: string | null

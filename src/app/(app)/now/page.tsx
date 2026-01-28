@@ -1,13 +1,15 @@
 'use client'
 
 import { useCurrentBlock } from '@/lib/hooks/useCurrentBlock'
+import { useBlocks } from '@/lib/hooks/useBlocks'
 import { useExecutionStore } from '@/lib/stores/execution-store'
 import { useSession } from '@/lib/hooks/useSession'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
+import type { Block } from '@/types'
 
 function formatTime(seconds: number): string {
     const mins = Math.floor(seconds / 60)
@@ -34,26 +36,56 @@ function getBlockTypeColor(type: string): string {
 }
 
 export default function NowPage() {
-    const { data: currentBlock, isLoading } = useCurrentBlock()
+    const { data: currentBlock, isLoading: currentBlockLoading } = useCurrentBlock()
+    const { blocks, isLoading: blocksLoading } = useBlocks()
     const { isRunning, elapsedSeconds, startTimer, stopTimer, tick, setCurrentBlock } = useExecutionStore()
     const { startSession, endSession } = useSession()
     const [mounted, setMounted] = useState(false)
     const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
     const blockStartTimeRef = useRef<Date | null>(null)
+    const [overrideBlock, setOverrideBlock] = useState<Block | null>(null)
+    const [autoStartTriggered, setAutoStartTriggered] = useState(false)
+
+    // The block to display - prefer override (from blocks page), fallback to current
+    const activeBlock = overrideBlock || currentBlock
 
     useEffect(() => {
         setMounted(true)
     }, [])
 
+    // Check for startBlockId in sessionStorage on mount - fetch directly by ID
     useEffect(() => {
-        if (currentBlock) {
-            setCurrentBlock(currentBlock)
+        if (!mounted) return
+
+        const startBlockId = sessionStorage.getItem('startBlockId')
+        if (startBlockId) {
+            // Fetch the specific block directly - works for any block regardless of date
+            const fetchBlock = async () => {
+                const supabase = (await import('@/lib/supabase/client')).createClient()
+                const { data, error } = await supabase
+                    .from('blocks')
+                    .select('*')
+                    .eq('id', startBlockId)
+                    .single()
+
+                if (data && !error) {
+                    setOverrideBlock(data as unknown as Block)
+                }
+                sessionStorage.removeItem('startBlockId')
+            }
+            fetchBlock()
+        }
+    }, [mounted])
+
+    useEffect(() => {
+        if (activeBlock) {
+            setCurrentBlock(activeBlock)
             // Track when the block becomes current for TTS calculation
             if (!blockStartTimeRef.current) {
-                blockStartTimeRef.current = new Date(currentBlock.planned_start)
+                blockStartTimeRef.current = new Date(activeBlock.planned_start)
             }
         }
-    }, [currentBlock, setCurrentBlock])
+    }, [activeBlock, setCurrentBlock])
 
     useEffect(() => {
         let interval: NodeJS.Timeout | null = null
@@ -69,6 +101,8 @@ export default function NowPage() {
         }
     }, [isRunning, tick])
 
+    const isLoading = currentBlockLoading || blocksLoading
+
     if (!mounted || isLoading) {
         return (
             <div className="flex min-h-screen items-center justify-center">
@@ -80,7 +114,7 @@ export default function NowPage() {
         )
     }
 
-    if (!currentBlock) {
+    if (!activeBlock) {
         return (
             <div className="flex min-h-screen flex-col items-center justify-center px-6 text-center">
                 {/* Ambient glow effect */}
@@ -109,20 +143,20 @@ export default function NowPage() {
     }
 
     const blockDurationMinutes = Math.round(
-        (new Date(currentBlock.planned_end).getTime() - new Date(currentBlock.planned_start).getTime()) / 60000
+        (new Date(activeBlock.planned_end).getTime() - new Date(activeBlock.planned_start).getTime()) / 60000
     )
 
     const handleStart = async () => {
-        if (!currentBlock) return
+        if (!activeBlock) return
 
         // Calculate time-to-start (seconds since block started)
         const now = new Date()
-        const blockStart = new Date(currentBlock.planned_start)
+        const blockStart = new Date(activeBlock.planned_start)
         const timeToStart = Math.max(0, Math.floor((now.getTime() - blockStart.getTime()) / 1000))
 
         try {
             const session = await startSession.mutateAsync({
-                blockId: currentBlock.id,
+                blockId: activeBlock.id,
                 timeToStart,
             })
             setCurrentSessionId(session.id)
@@ -174,18 +208,18 @@ export default function NowPage() {
                     <CardContent className="p-5">
                         <div className="flex items-start gap-4">
                             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-zinc-800 text-2xl">
-                                {getBlockTypeEmoji(currentBlock.type)}
+                                {getBlockTypeEmoji(activeBlock.type)}
                             </div>
                             <div className="min-w-0 flex-1">
                                 <h2 className="truncate text-lg font-semibold text-white">
-                                    {currentBlock.title}
+                                    {activeBlock.title}
                                 </h2>
                                 <div className="mt-2 flex flex-wrap items-center gap-2">
                                     <Badge
                                         variant="outline"
-                                        className={cn("text-xs font-medium", getBlockTypeColor(currentBlock.type))}
+                                        className={cn("text-xs font-medium", getBlockTypeColor(activeBlock.type))}
                                     >
-                                        {currentBlock.type.charAt(0).toUpperCase() + currentBlock.type.slice(1)}
+                                        {activeBlock.type.charAt(0).toUpperCase() + activeBlock.type.slice(1)}
                                     </Badge>
                                     <span className="text-sm text-zinc-500">
                                         {blockDurationMinutes} min
@@ -196,13 +230,13 @@ export default function NowPage() {
                                 <div className="mt-3 flex items-center gap-1.5 text-xs text-zinc-500">
                                     <span>🕐</span>
                                     <span>
-                                        {new Date(currentBlock.planned_start).toLocaleTimeString('en-US', {
+                                        {new Date(activeBlock.planned_start).toLocaleTimeString('en-US', {
                                             hour: 'numeric',
                                             minute: '2-digit',
                                             hour12: true
                                         })}
                                         {' → '}
-                                        {new Date(currentBlock.planned_end).toLocaleTimeString('en-US', {
+                                        {new Date(activeBlock.planned_end).toLocaleTimeString('en-US', {
                                             hour: 'numeric',
                                             minute: '2-digit',
                                             hour12: true
@@ -213,11 +247,11 @@ export default function NowPage() {
                         </div>
 
                         {/* Quick Links */}
-                        {(currentBlock.task_link || currentBlock.linear_issue_id || currentBlock.calendar_id) && (
+                        {(activeBlock.task_link || activeBlock.linear_issue_id || activeBlock.calendar_id) && (
                             <div className="mt-4 flex flex-wrap gap-2 border-t border-zinc-800 pt-4">
-                                {currentBlock.task_link && (
+                                {activeBlock.task_link && (
                                     <a
-                                        href={currentBlock.task_link}
+                                        href={activeBlock.task_link}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-500/10 px-3 py-1.5 text-xs font-medium text-indigo-400 ring-1 ring-indigo-500/20 transition-colors hover:bg-indigo-500/20"
@@ -225,12 +259,12 @@ export default function NowPage() {
                                         <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor">
                                             <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z" />
                                         </svg>
-                                        {currentBlock.linear_issue_id || 'Linear'}
+                                        {activeBlock.linear_issue_id || 'Linear'}
                                     </a>
                                 )}
-                                {currentBlock.calendar_id && (
+                                {activeBlock.calendar_id && (
                                     <a
-                                        href={`https://calendar.google.com/calendar/event?eid=${currentBlock.calendar_id}`}
+                                        href={`https://calendar.google.com/calendar/event?eid=${activeBlock.calendar_id}`}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="inline-flex items-center gap-1.5 rounded-lg bg-blue-500/10 px-3 py-1.5 text-xs font-medium text-blue-400 ring-1 ring-blue-500/20 transition-colors hover:bg-blue-500/20"
@@ -324,14 +358,14 @@ export default function NowPage() {
                 </div>
 
                 {/* Stop Condition */}
-                {currentBlock.stop_condition && (
+                {activeBlock.stop_condition && (
                     <Card className="mt-6 w-full border-zinc-800 bg-zinc-900/50">
                         <CardContent className="p-4">
                             <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">
                                 Stop Condition
                             </p>
                             <p className="mt-1 text-sm text-zinc-300">
-                                {currentBlock.stop_condition}
+                                {activeBlock.stop_condition}
                             </p>
                         </CardContent>
                     </Card>
@@ -347,6 +381,11 @@ export default function NowPage() {
                         <a href="/stats">Stats</a>
                     </Button>
                 </div>
+
+                {/* Debug: Show block ID */}
+                <p className="mt-4 text-[10px] text-zinc-600 font-mono">
+                    Block ID: {activeBlock?.id || 'none'}
+                </p>
             </div>
         </div>
     )

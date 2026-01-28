@@ -9,10 +9,12 @@ const REDIRECT_URI = process.env.NEXT_PUBLIC_SITE_URL
     ? `${process.env.NEXT_PUBLIC_SITE_URL}/api/calendar/callback`
     : 'http://localhost:3000/api/calendar/callback'
 
-// Scopes needed for calendar read access
+// Scopes needed for calendar read AND write access
 const SCOPES = [
     'https://www.googleapis.com/auth/calendar.readonly',
     'https://www.googleapis.com/auth/calendar.events.readonly',
+    'https://www.googleapis.com/auth/calendar',  // Full calendar access (create calendars)
+    'https://www.googleapis.com/auth/calendar.events',  // Write events
 ].join(' ')
 
 export async function GET(request: NextRequest) {

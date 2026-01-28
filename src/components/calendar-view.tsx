@@ -3,6 +3,7 @@
 import { useMemo } from 'react'
 import { cn } from '@/lib/utils'
 import { type BlockType, BLOCK_CONFIGS } from '@/lib/blocks/config'
+import { type BlockColorPreferences, getBlockColorClass } from '@/lib/hooks/useBlockColorPreferences'
 
 interface DisplayBlock {
     id: string
@@ -12,13 +13,21 @@ interface DisplayBlock {
     planned_end: string
     stop_condition?: string
     source: 'manual' | 'calendar'
+    calendar_id?: string | null  // For looking up calendar color
     calendar_link?: string
+}
+
+interface Calendar {
+    id: string
+    color?: string
 }
 
 interface CalendarViewProps {
     blocks: DisplayBlock[]
     viewMode: 'today' | 'week'
     onBlockClick?: (blockId: string) => void
+    colorPrefs?: BlockColorPreferences
+    calendars?: Calendar[]  // For looking up calendar colors
 }
 
 // Hours to display (6 AM to 11 PM)
@@ -63,7 +72,20 @@ function isSameDay(d1: Date, d2: Date): boolean {
         d1.getDate() === d2.getDate()
 }
 
-export function CalendarView({ blocks, viewMode, onBlockClick }: CalendarViewProps) {
+export function CalendarView({ blocks, viewMode, onBlockClick, colorPrefs, calendars = [] }: CalendarViewProps) {
+    // Default color for manual blocks
+    const manualColor = colorPrefs?.manualBlockColor ?? 'emerald'
+
+    // Helper to get calendar color by ID
+    // Note: calendar_id on blocks is stored as "calendarId::eventId" format
+    const getCalendarColorById = (calendarId: string | null | undefined): string | undefined => {
+        if (!calendarId) return undefined
+        // Extract the actual calendar ID (before the "::")
+        const actualCalendarId = calendarId.split('::')[0]
+        const calendar = calendars.find(c => c.id === actualCalendarId)
+        return calendar?.color
+    }
+
     const now = new Date()
     const weekDays = useMemo(() => getWeekDays(now), [])
 
@@ -148,6 +170,7 @@ export function CalendarView({ blocks, viewMode, onBlockClick }: CalendarViewPro
                     {todayBlocks.map((block) => {
                         const style = getBlockStyle(block)
                         const config = BLOCK_CONFIGS[block.type]
+                        const blockCalendarColor = block.source === 'calendar' ? getCalendarColorById(block.calendar_id) : undefined
 
                         return (
                             <button
@@ -155,10 +178,22 @@ export function CalendarView({ blocks, viewMode, onBlockClick }: CalendarViewPro
                                 onClick={() => onBlockClick?.(block.id)}
                                 className={cn(
                                     "absolute rounded-lg px-2 py-1 text-left transition-all hover:ring-2 hover:ring-white/20",
-                                    getBlockColor(block.type),
-                                    "overflow-hidden"
+                                    // Manual blocks use block type color, calendar blocks use inline style
+                                    block.source === 'manual' && getBlockColor(block.type),
+                                    "overflow-hidden",
+                                    // Source indicator - left border
+                                    "border-l-2",
+                                    // Manual blocks use user preference for border
+                                    block.source === 'manual' && getBlockColorClass(manualColor)
                                 )}
-                                style={style}
+                                style={{
+                                    ...style,
+                                    // For calendar blocks, use the actual calendar color for both bg and border
+                                    ...(block.source === 'calendar' ? {
+                                        backgroundColor: blockCalendarColor ? `${blockCalendarColor}33` : '#71717a33', // 20% opacity
+                                        borderLeftColor: blockCalendarColor ?? '#71717a'
+                                    } : {})
+                                }}
                             >
                                 <div className="flex items-center gap-1.5 text-white">
                                     {config?.icon && <config.icon className="h-3 w-3 shrink-0" />}
@@ -265,6 +300,7 @@ export function CalendarView({ blocks, viewMode, onBlockClick }: CalendarViewPro
                         return dayBlocks.map((block) => {
                             const style = getBlockStyle(block, dayIndex)
                             const config = BLOCK_CONFIGS[block.type]
+                            const blockCalendarColor = block.source === 'calendar' ? getCalendarColorById(block.calendar_id) : undefined
 
                             return (
                                 <button
@@ -272,10 +308,22 @@ export function CalendarView({ blocks, viewMode, onBlockClick }: CalendarViewPro
                                     onClick={() => onBlockClick?.(block.id)}
                                     className={cn(
                                         "absolute rounded px-1 py-0.5 text-left transition-all hover:ring-1 hover:ring-white/30",
-                                        getBlockColor(block.type),
-                                        "overflow-hidden"
+                                        // Manual blocks use block type color, calendar blocks use inline style
+                                        block.source === 'manual' && getBlockColor(block.type),
+                                        "overflow-hidden",
+                                        // Source indicator - left border
+                                        "border-l-2",
+                                        // Manual blocks use user preference for border
+                                        block.source === 'manual' && getBlockColorClass(manualColor)
                                     )}
-                                    style={style}
+                                    style={{
+                                        ...style,
+                                        // For calendar blocks, use the actual calendar color for both bg and border
+                                        ...(block.source === 'calendar' ? {
+                                            backgroundColor: blockCalendarColor ? `${blockCalendarColor}33` : '#71717a33', // 20% opacity
+                                            borderLeftColor: blockCalendarColor ?? '#71717a'
+                                        } : {})
+                                    }}
                                 >
                                     <div className="flex items-center gap-1 text-white leading-tight">
                                         {config?.icon && <config.icon className="h-2.5 w-2.5 shrink-0" />}

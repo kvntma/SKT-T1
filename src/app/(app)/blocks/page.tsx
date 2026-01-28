@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
@@ -28,7 +28,9 @@ import {
     isTrackable
 } from '@/lib/blocks/config'
 import { CalendarView } from '@/components/calendar-view'
+import { DateTimePicker } from '@/components/ui/date-time-picker'
 import { createClient } from '@/lib/supabase/client'
+import { useBlockColorPreferences, getBlockColorClass } from '@/lib/hooks/useBlockColorPreferences'
 
 type ViewMode = 'today' | 'week'
 type DisplayMode = 'list' | 'calendar'
@@ -84,6 +86,16 @@ function formatRelativeTime(dateString: string): string {
     })
 }
 
+// Helper to get calendar color by ID
+// Note: calendar_id on blocks is stored as "calendarId::eventId" format
+function getCalendarColor(calendarId: string | null | undefined, calendars: Array<{ id: string; color?: string }>): string | undefined {
+    if (!calendarId) return undefined
+    // Extract the actual calendar ID (before the "::")
+    const actualCalendarId = calendarId.split('::')[0]
+    const calendar = calendars.find(c => c.id === actualCalendarId)
+    return calendar?.color
+}
+
 // Unified block type for display
 interface DisplayBlock {
     id: string
@@ -93,10 +105,16 @@ interface DisplayBlock {
     planned_end: string
     stop_condition?: string
     source: 'manual' | 'calendar'
+    calendar_id?: string | null  // For looking up calendar color
     calendar_link?: string
+    google_event_id?: string | null
+    linear_issue_id?: string | null
+    task_link?: string | null
     session?: {
+        id?: string
         outcome?: string | null
-        started_at?: string | null
+        actual_start?: string | null
+        actual_end?: string | null
     } | null
 }
 
@@ -112,7 +130,8 @@ export default function BlocksPage() {
         isLoadingEvents,
         connectCalendar,
         events,
-        calendars,
+        calendars,      // Filtered list for sync selection (excludes Push To Start calendar)
+        allCalendars,   // Full list for color lookups
         syncedCalendarIds,
         lastCalendarSync,
         isCalendarSynced,
@@ -121,6 +140,7 @@ export default function BlocksPage() {
         refreshEvents
     } = useCalendar()
     const { forceSync, isForceSyncing } = useCalendarSync()
+    const { preferences: colorPrefs } = useBlockColorPreferences()
 
     // All blocks come from DB now - calendar events are synced as blocks with calendar_id set
     // No more separate calendar events merging to avoid duplicates
@@ -140,24 +160,51 @@ export default function BlocksPage() {
                 planned_end: block.planned_end,
                 stop_condition: block.stop_condition ?? undefined,
                 source: isCalendarBlock ? 'calendar' as const : 'manual' as const,
-                calendar_link: block.task_link ?? undefined, // task_link stores calendar htmlLink
+                calendar_id: block.calendar_id,  // Pass through for color lookup
+                calendar_link: isCalendarBlock ? block.task_link ?? undefined : undefined,
+                google_event_id: block.google_event_id,
+                linear_issue_id: block.linear_issue_id,
+                task_link: !isCalendarBlock ? block.task_link : undefined, // Only for manual blocks
                 // Use session data from the joined query
-                session: (block as { session?: { outcome?: string; actual_start?: string } }).session ?? null,
+                session: (block as { session?: { id?: string; outcome?: string; actual_start?: string; actual_end?: string } }).session ?? null,
             }
         }).sort((a, b) =>
             new Date(a.planned_start).getTime() - new Date(b.planned_start).getTime()
         )
     }, [blocks])
+
+    // Current time state - updates every minute to keep block statuses fresh
+    const [currentTime, setCurrentTime] = useState(() => new Date())
+
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setCurrentTime(new Date())
+        }, 60000) // Update every minute
+
+        return () => clearInterval(timer)
+    }, [])
+
     const [showCreate, setShowCreate] = useState(false)
     const [calendarExpanded, setCalendarExpanded] = useState(false)
     const [displayMode, setDisplayMode] = useState<DisplayMode>('list')
     const [isSubmitting, setIsSubmitting] = useState(false)
-    const [newBlock, setNewBlock] = useState({
+    const [isPushingToCalendar, setIsPushingToCalendar] = useState(false)
+    const [newBlock, setNewBlock] = useState<{
+        title: string
+        type: BlockType
+        duration: string
+        stopCondition: string
+        startTime: Date | undefined
+        bufferBefore: string
+        bufferAfter: string
+    }>({
         title: '',
         type: 'focus' as BlockType,
         duration: '25',
         stopCondition: '',
-        startTime: '',
+        startTime: undefined,
+        bufferBefore: '0',  // minutes (0, 5, 10, 15)
+        bufferAfter: '0',   // minutes (0, 5, 10, 15)
     })
 
     // Skip reasons (similar to abort reasons but for blocks that were never started)
@@ -179,6 +226,30 @@ export default function BlocksPage() {
 
     // Handle starting a block - navigate to /now with block context
     const handleStart = (blockId: string) => {
+        // Safety check: Verify block can still be started (not past end time)
+        const block = allBlocks.find(b => b.id === blockId)
+        if (block) {
+            const startTime = new Date(block.planned_start)
+            const endTime = new Date(block.planned_end)
+            const now = new Date()
+
+            if (now >= endTime) {
+                // Block has passed - show resolve modal instead
+                console.log('Block has passed end time, showing resolve modal')
+                handleResolve(blockId)
+                return
+            }
+
+            // Check if more than 4 hours early
+            const hoursUntilStart = (startTime.getTime() - now.getTime()) / (1000 * 60 * 60)
+            if (hoursUntilStart > 4) {
+                const confirmed = window.confirm(
+                    `This block is scheduled to start in ${Math.round(hoursUntilStart)} hours. Are you sure you want to start it now?`
+                )
+                if (!confirmed) return
+            }
+        }
+
         // Store the block ID to start - the /now page will pick it up
         sessionStorage.setItem('startBlockId', blockId)
         router.push('/now')
@@ -267,19 +338,46 @@ export default function BlocksPage() {
 
         setIsSubmitting(true)
         try {
-            const plannedStart = new Date(newBlock.startTime)
-            const plannedEnd = new Date(plannedStart.getTime() + parseInt(newBlock.duration) * 60 * 1000)
+            const bufferBeforeMs = parseInt(newBlock.bufferBefore) * 60 * 1000
+            const bufferAfterMs = parseInt(newBlock.bufferAfter) * 60 * 1000
+            const durationMs = parseInt(newBlock.duration) * 60 * 1000
 
+            // Calculate actual start time (accounting for buffer before)
+            const mainBlockStart = new Date(newBlock.startTime)
+            const mainBlockEnd = new Date(mainBlockStart.getTime() + durationMs)
+
+            // Create buffer block BEFORE if specified
+            if (bufferBeforeMs > 0) {
+                const bufferStart = new Date(mainBlockStart.getTime() - bufferBeforeMs)
+                await createBlock.mutateAsync({
+                    title: 'Buffer',
+                    type: 'recovery',
+                    planned_start: bufferStart.toISOString(),
+                    planned_end: mainBlockStart.toISOString(),
+                })
+            }
+
+            // Create the main block
             await createBlock.mutateAsync({
                 title: newBlock.title,
                 type: newBlock.type,
-                planned_start: plannedStart.toISOString(),
-                planned_end: plannedEnd.toISOString(),
+                planned_start: mainBlockStart.toISOString(),
+                planned_end: mainBlockEnd.toISOString(),
                 stop_condition: newBlock.stopCondition || undefined,
             })
 
+            // Create buffer block AFTER if specified
+            if (bufferAfterMs > 0) {
+                await createBlock.mutateAsync({
+                    title: 'Buffer',
+                    type: 'recovery',
+                    planned_start: mainBlockEnd.toISOString(),
+                    planned_end: new Date(mainBlockEnd.getTime() + bufferAfterMs).toISOString(),
+                })
+            }
+
             setShowCreate(false)
-            setNewBlock({ title: '', type: 'focus', duration: '25', stopCondition: '', startTime: '' })
+            setNewBlock({ title: '', type: 'focus', duration: '25', stopCondition: '', startTime: undefined, bufferBefore: '0', bufferAfter: '0' })
         } catch (error) {
             console.error('Failed to create block:', error)
         } finally {
@@ -296,12 +394,40 @@ export default function BlocksPage() {
         }
     }
 
-    // Generate a default start time (next 15-min increment)
-    const getDefaultStartTime = () => {
+    // Generate a default start time (next 15-min increment) as Date
+    const getDefaultStartTime = (): Date => {
         const now = new Date()
         const minutes = Math.ceil(now.getMinutes() / 15) * 15
-        now.setMinutes(minutes, 0, 0)
-        return now.toISOString().slice(0, 16) // Format for datetime-local input
+        if (minutes === 60) {
+            now.setHours(now.getHours() + 1, 0, 0, 0)
+        } else {
+            now.setMinutes(minutes, 0, 0)
+        }
+        return now
+    }
+
+    // Push blocks to Google Calendar
+    const handlePushToCalendar = async () => {
+        setIsPushingToCalendar(true)
+        try {
+            const response = await fetch('/api/calendar/push', { method: 'POST' })
+            const data = await response.json()
+
+            if (data.success) {
+                alert(`✅ Pushed ${data.pushed} new blocks, updated ${data.updated} blocks to Google Calendar!`)
+            } else if (data.error === 'Calendar not connected') {
+                alert('❌ Calendar not connected.\n\nPlease connect your Google Calendar first.')
+            } else if (response.status === 401 || data.error?.includes('Token') || data.error?.includes('scope')) {
+                alert('❌ Calendar permissions need to be updated.\n\nPlease disconnect and reconnect your Google Calendar to grant write permissions.\n\nGo to Google Account → Security → Third-party apps → Remove "Push To Start", then reconnect here.')
+            } else {
+                alert(`❌ Failed to push: ${data.error}\n\nIf this persists, try disconnecting and reconnecting your Google Calendar.`)
+            }
+        } catch (error) {
+            console.error('Failed to push to calendar:', error)
+            alert('❌ Failed to push blocks to calendar.\n\nPlease try disconnecting and reconnecting your Google Calendar to grant the required permissions.')
+        } finally {
+            setIsPushingToCalendar(false)
+        }
     }
 
     return (
@@ -326,68 +452,6 @@ export default function BlocksPage() {
                     >
                         {showCreate ? 'Cancel' : '+ New Block'}
                     </Button>
-                </div>
-
-                {/* View Mode Tabs */}
-                <div className="mb-6 flex items-center justify-between">
-                    {/* Time Range Toggle */}
-                    <div className="flex gap-2">
-                        <button
-                            onClick={() => setViewMode('today')}
-                            className={cn(
-                                "px-4 py-2 text-sm font-medium rounded-lg transition-colors",
-                                viewMode === 'today'
-                                    ? "bg-white text-black"
-                                    : "bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700"
-                            )}
-                        >
-                            Today
-                        </button>
-                        <button
-                            onClick={() => setViewMode('week')}
-                            className={cn(
-                                "px-4 py-2 text-sm font-medium rounded-lg transition-colors",
-                                viewMode === 'week'
-                                    ? "bg-white text-black"
-                                    : "bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700"
-                            )}
-                        >
-                            Week
-                        </button>
-                    </div>
-
-                    {/* List/Calendar Toggle */}
-                    <div className="flex gap-1 rounded-lg bg-zinc-800 p-1">
-                        <button
-                            onClick={() => setDisplayMode('list')}
-                            className={cn(
-                                "p-2 rounded-md transition-colors",
-                                displayMode === 'list'
-                                    ? "bg-zinc-700 text-white"
-                                    : "text-zinc-400 hover:text-white"
-                            )}
-                            title="List view"
-                        >
-                            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                            </svg>
-                        </button>
-                        <button
-                            onClick={() => setDisplayMode('calendar')}
-                            className={cn(
-                                "p-2 rounded-md transition-colors",
-                                displayMode === 'calendar'
-                                    ? "bg-zinc-700 text-white"
-                                    : "text-zinc-400 hover:text-white"
-                            )}
-                            title="Calendar view"
-                        >
-                            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                <rect x="3" y="4" width="18" height="18" rx="2" strokeWidth={2} />
-                                <path strokeWidth={2} d="M16 2v4M8 2v4M3 10h18" />
-                            </svg>
-                        </button>
-                    </div>
                 </div>
 
                 {/* Google Calendar Connection */}
@@ -428,6 +492,24 @@ export default function BlocksPage() {
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                                             </svg>
                                         )}
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={handlePushToCalendar}
+                                        disabled={isPushingToCalendar}
+                                        className="border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
+                                    >
+                                        {isPushingToCalendar ? (
+                                            <svg className="mr-1 h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                            </svg>
+                                        ) : (
+                                            <svg className="mr-1 h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                                            </svg>
+                                        )}
+                                        Push
                                     </Button>
                                 </div>
                             ) : (
@@ -540,7 +622,16 @@ export default function BlocksPage() {
                 {/* Create Block Form */}
                 {showCreate && (
                     <Card className="mb-6 border-zinc-800 bg-zinc-900/80 backdrop-blur-xl">
-                        <CardHeader>
+                        <CardHeader className="relative">
+                            <button
+                                onClick={() => setShowCreate(false)}
+                                className="absolute right-4 top-4 p-1 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+                                aria-label="Close"
+                            >
+                                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
                             <CardTitle className="text-lg">Create Block</CardTitle>
                             <CardDescription>
                                 Schedule a new time block
@@ -563,16 +654,15 @@ export default function BlocksPage() {
                                 <label className="mb-2 block text-sm font-medium text-zinc-400">
                                     Start Time
                                 </label>
-                                <Input
-                                    type="datetime-local"
+                                <DateTimePicker
                                     value={newBlock.startTime}
-                                    onChange={(e) => setNewBlock({ ...newBlock, startTime: e.target.value })}
-                                    className="border-zinc-700 bg-zinc-800/50"
+                                    onChange={(date) => setNewBlock({ ...newBlock, startTime: date })}
+                                    minDate={getDefaultStartTime()}
                                 />
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
+                            <div className="flex gap-2">
+                                <div className="w-[55%]">
                                     <label className="mb-2 block text-sm font-medium text-zinc-400">
                                         Type
                                     </label>
@@ -594,7 +684,7 @@ export default function BlocksPage() {
                                     </Select>
                                 </div>
 
-                                <div>
+                                <div className="w-[45%]">
                                     <label className="mb-2 block text-sm font-medium text-zinc-400">
                                         Duration
                                     </label>
@@ -608,9 +698,13 @@ export default function BlocksPage() {
                                         <SelectContent className="border-zinc-700 bg-zinc-900">
                                             <SelectItem value="15">15 min</SelectItem>
                                             <SelectItem value="25">25 min</SelectItem>
+                                            <SelectItem value="30">30 min</SelectItem>
                                             <SelectItem value="45">45 min</SelectItem>
-                                            <SelectItem value="60">60 min</SelectItem>
-                                            <SelectItem value="90">90 min</SelectItem>
+                                            <SelectItem value="60">1 hour</SelectItem>
+                                            <SelectItem value="90">1.5 hours</SelectItem>
+                                            <SelectItem value="120">2 hours</SelectItem>
+                                            <SelectItem value="150">2.5 hours</SelectItem>
+                                            <SelectItem value="180">3 hours</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -629,6 +723,56 @@ export default function BlocksPage() {
                                 />
                             </div>
 
+                            {/* Buffer Blocks */}
+                            <div className="rounded-lg border border-zinc-800 bg-zinc-800/30 p-4">
+                                <label className="mb-3 block text-sm font-medium text-zinc-400">
+                                    ✨ Add Buffer Blocks (Recovery time)
+                                </label>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="mb-1 block text-xs text-zinc-500">
+                                            Before
+                                        </label>
+                                        <Select
+                                            value={newBlock.bufferBefore}
+                                            onValueChange={(value) => setNewBlock({ ...newBlock, bufferBefore: value })}
+                                        >
+                                            <SelectTrigger className="border-zinc-700 bg-zinc-800/50">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent className="border-zinc-700 bg-zinc-900">
+                                                <SelectItem value="0">None</SelectItem>
+                                                <SelectItem value="5">5 min</SelectItem>
+                                                <SelectItem value="10">10 min</SelectItem>
+                                                <SelectItem value="15">15 min</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div>
+                                        <label className="mb-1 block text-xs text-zinc-500">
+                                            After
+                                        </label>
+                                        <Select
+                                            value={newBlock.bufferAfter}
+                                            onValueChange={(value) => setNewBlock({ ...newBlock, bufferAfter: value })}
+                                        >
+                                            <SelectTrigger className="border-zinc-700 bg-zinc-800/50">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent className="border-zinc-700 bg-zinc-900">
+                                                <SelectItem value="0">None</SelectItem>
+                                                <SelectItem value="5">5 min</SelectItem>
+                                                <SelectItem value="10">10 min</SelectItem>
+                                                <SelectItem value="15">15 min</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                </div>
+                                <p className="mt-2 text-xs text-zinc-600">
+                                    Buffer blocks help you transition between tasks
+                                </p>
+                            </div>
+
                             <Button
                                 onClick={handleCreate}
                                 disabled={!newBlock.title || !newBlock.startTime || isSubmitting}
@@ -642,15 +786,73 @@ export default function BlocksPage() {
 
                 {/* Block List / Calendar View */}
                 <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                        <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">
-                            {viewMode === 'today' ? "Today's Blocks" : "This Week's Blocks"}
-                        </p>
-                        {allBlocks.length > 0 && (
-                            <p className="text-xs text-zinc-600">
-                                {allBlocks.length} block{allBlocks.length !== 1 ? 's' : ''}
-                            </p>
-                        )}
+                    {/* View Mode Controls */}
+                    <div className="flex items-center justify-between mb-4">
+                        {/* Time Range Toggle */}
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => setViewMode('today')}
+                                className={cn(
+                                    "px-3 py-1.5 text-sm font-medium rounded-lg transition-colors",
+                                    viewMode === 'today'
+                                        ? "bg-white text-black"
+                                        : "bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700"
+                                )}
+                            >
+                                Today
+                            </button>
+                            <button
+                                onClick={() => setViewMode('week')}
+                                className={cn(
+                                    "px-3 py-1.5 text-sm font-medium rounded-lg transition-colors",
+                                    viewMode === 'week'
+                                        ? "bg-white text-black"
+                                        : "bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700"
+                                )}
+                            >
+                                Week
+                            </button>
+                        </div>
+
+                        {/* List/Calendar Toggle + Count */}
+                        <div className="flex items-center gap-3">
+                            {allBlocks.length > 0 && (
+                                <p className="text-xs text-zinc-600">
+                                    {allBlocks.length} block{allBlocks.length !== 1 ? 's' : ''}
+                                </p>
+                            )}
+                            <div className="flex gap-1 rounded-lg bg-zinc-800 p-1">
+                                <button
+                                    onClick={() => setDisplayMode('list')}
+                                    className={cn(
+                                        "p-2 rounded-md transition-colors",
+                                        displayMode === 'list'
+                                            ? "bg-zinc-700 text-white"
+                                            : "text-zinc-400 hover:text-white"
+                                    )}
+                                    title="List view"
+                                >
+                                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                                    </svg>
+                                </button>
+                                <button
+                                    onClick={() => setDisplayMode('calendar')}
+                                    className={cn(
+                                        "p-2 rounded-md transition-colors",
+                                        displayMode === 'calendar'
+                                            ? "bg-zinc-700 text-white"
+                                            : "text-zinc-400 hover:text-white"
+                                    )}
+                                    title="Calendar view"
+                                >
+                                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                        <rect x="3" y="4" width="18" height="18" rx="2" strokeWidth={2} />
+                                        <path strokeWidth={2} d="M16 2v4M8 2v4M3 10h18" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
                     {isLoading || isLoadingEvents ? (
@@ -674,6 +876,8 @@ export default function BlocksPage() {
                         <CalendarView
                             blocks={allBlocks}
                             viewMode={viewMode}
+                            colorPrefs={colorPrefs}
+                            calendars={allCalendars}
                             onBlockClick={(blockId) => {
                                 // For now, just log - could open a detail modal
                                 console.log('Block clicked:', blockId)
@@ -681,20 +885,34 @@ export default function BlocksPage() {
                         />
                     ) : (
                         allBlocks.map((block) => {
-                            const status = getBlockStatus(block, block.session)
+                            const status = getBlockStatus(block, block.session, currentTime)
                             const trackable = isTrackable(block.type)
                             const config = getBlockConfig(block.type)
+
+                            // Get the left border color for this block
+                            const calendarColor = block.source === 'calendar' ? getCalendarColor(block.calendar_id, allCalendars) : undefined
 
                             return (
                                 <Card
                                     key={block.id}
                                     className={cn(
                                         "border-zinc-800 bg-zinc-900/80 backdrop-blur-xl transition-colors hover:border-zinc-700",
-                                        block.source === 'calendar' && "border-l-2 border-l-zinc-600",
+                                        // Source indicator - left border
+                                        "border-l-2",
+                                        // Manual blocks use user preference, calendar blocks use inline style
+                                        block.source === 'manual' && getBlockColorClass(colorPrefs.manualBlockColor),
+                                        // Status overrides
                                         status.status === 'ready' && trackable && "ring-1 ring-emerald-500/30",
                                         status.status === 'done' && "opacity-60",
-                                        status.status === 'missed' && "border-l-2 border-l-amber-500/50"
+                                        status.status === 'missed' && "border-l-amber-500" // Override source color when missed
                                     )}
+                                    style={
+                                        // For calendar blocks, use the actual calendar color (unless missed)
+                                        // Fallback to grey (#71717a = zinc-500) if no color is found
+                                        block.source === 'calendar' && status.status !== 'missed'
+                                            ? { borderLeftColor: calendarColor ?? '#71717a' }
+                                            : undefined
+                                    }
                                 >
                                     <CardContent className="flex items-center gap-4 p-4">
                                         <div className={cn(
@@ -797,19 +1015,82 @@ export default function BlocksPage() {
                                                 </Button>
                                             )}
 
-                                            {/* Calendar link for calendar events */}
-                                            {block.source === 'calendar' && block.calendar_link && (
+                                            {/* Calendar link for synced blocks */}
+                                            {(block.google_event_id || (block.source === 'calendar' && block.calendar_link)) && (
                                                 <Button
                                                     variant="ghost"
                                                     size="sm"
                                                     className="text-zinc-500 hover:text-blue-400"
+                                                    title="Open in Google Calendar"
                                                     asChild
                                                 >
-                                                    <a href={block.calendar_link} target="_blank" rel="noopener noreferrer">
+                                                    <a
+                                                        href={block.calendar_link || `https://calendar.google.com/calendar/event?eid=${block.google_event_id}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                    >
+                                                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <rect x="3" y="4" width="18" height="18" rx="2" strokeWidth={2} />
+                                                            <path strokeWidth={2} d="M16 2v4M8 2v4M3 10h18" />
+                                                        </svg>
+                                                    </a>
+                                                </Button>
+                                            )}
+
+                                            {/* Linear ticket link */}
+                                            {block.linear_issue_id && (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="text-zinc-500 hover:text-indigo-400"
+                                                    title={`Open ${block.linear_issue_id}`}
+                                                    asChild
+                                                >
+                                                    <a
+                                                        href={`https://linear.app/issue/${block.linear_issue_id}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                    >
+                                                        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+                                                            <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
+                                                        </svg>
+                                                    </a>
+                                                </Button>
+                                            )}
+
+                                            {/* External task link (for other integrations) */}
+                                            {block.task_link && !block.linear_issue_id && (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="text-zinc-500 hover:text-purple-400"
+                                                    title="Open task link"
+                                                    asChild
+                                                >
+                                                    <a
+                                                        href={block.task_link}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                    >
                                                         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                                                         </svg>
                                                     </a>
+                                                </Button>
+                                            )}
+
+                                            {/* Edit/Details button for completed manual blocks */}
+                                            {block.source === 'manual' && (status.status === 'done' || status.status === 'stopped' || status.status === 'skipped') && (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="text-zinc-500 hover:text-white"
+                                                    title="View stats & edit"
+                                                    onClick={() => router.push(`/blocks/${block.id}`)}
+                                                >
+                                                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                                    </svg>
                                                 </Button>
                                             )}
 
@@ -836,107 +1117,109 @@ export default function BlocksPage() {
             </div>
 
             {/* Resolve Modal */}
-            {resolveBlockId && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-                    <Card className="w-full max-w-sm mx-4 border-zinc-700 bg-zinc-900">
-                        {resolveStep === 'choice' ? (
-                            <>
-                                <CardHeader>
-                                    <CardTitle className="text-lg">Resolve Missed Block</CardTitle>
-                                    <CardDescription>
-                                        What happened with this block?
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-4 pt-2">
-                                    <button
-                                        className="w-full flex items-center gap-4 p-4 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
-                                        onClick={() => handleResolutionChoice('done')}
-                                    >
-                                        <span className="text-2xl">✅</span>
-                                        <div className="text-left">
-                                            <p className="font-medium text-white">I completed it</p>
-                                            <p className="text-sm text-emerald-100/80">Mark as done</p>
-                                        </div>
-                                    </button>
-
-                                    <button
-                                        className="w-full flex items-center gap-4 p-4 rounded-md border border-zinc-700 bg-zinc-800/50 hover:bg-zinc-800 text-zinc-300 transition-colors"
-                                        onClick={handleSkipChoice}
-                                    >
-                                        <span className="text-2xl">⏭️</span>
-                                        <div className="text-left">
-                                            <p className="font-medium text-zinc-200">I skipped it</p>
-                                            <p className="text-sm text-zinc-500">Didn't get to it this time</p>
-                                        </div>
-                                    </button>
-
-                                    <div className="pt-3">
-                                        <Button
-                                            variant="ghost"
-                                            className="w-full text-zinc-500 hover:text-zinc-300"
-                                            onClick={() => setResolveBlockId(null)}
-                                        >
-                                            Cancel
-                                        </Button>
-                                    </div>
-                                </CardContent>
-                            </>
-                        ) : (
-                            <>
-                                <CardHeader>
-                                    <CardTitle className="text-lg">Why did you skip?</CardTitle>
-                                    <CardDescription>
-                                        This helps identify patterns for better planning
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-3">
-                                    {SKIP_REASONS.map((reason) => (
+            {
+                resolveBlockId && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                        <Card className="w-full max-w-sm mx-4 border-zinc-700 bg-zinc-900">
+                            {resolveStep === 'choice' ? (
+                                <>
+                                    <CardHeader>
+                                        <CardTitle className="text-lg">Resolve Missed Block</CardTitle>
+                                        <CardDescription>
+                                            What happened with this block?
+                                        </CardDescription>
+                                    </CardHeader>
+                                    <CardContent className="space-y-4 pt-2">
                                         <button
-                                            key={reason.value}
-                                            className={cn(
-                                                "w-full flex items-center gap-3 p-3 rounded-md border transition-colors text-left",
-                                                skipReason === reason.value
-                                                    ? "border-white/30 bg-zinc-800"
-                                                    : "border-zinc-700 bg-zinc-800/50 hover:bg-zinc-800"
-                                            )}
-                                            onClick={() => setSkipReason(reason.value)}
+                                            className="w-full flex items-center gap-4 p-4 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
+                                            onClick={() => handleResolutionChoice('done')}
                                         >
-                                            <span className="text-xl">{reason.emoji}</span>
-                                            <span className="text-zinc-200">{reason.label}</span>
+                                            <span className="text-2xl">✅</span>
+                                            <div className="text-left">
+                                                <p className="font-medium text-white">I completed it</p>
+                                                <p className="text-sm text-emerald-100/80">Mark as done</p>
+                                            </div>
                                         </button>
-                                    ))}
 
-                                    {skipReason === 'other' && (
-                                        <Textarea
-                                            placeholder="What happened?"
-                                            value={otherReason}
-                                            onChange={(e) => setOtherReason(e.target.value)}
-                                            className="mt-2 bg-zinc-800 border-zinc-700"
-                                        />
-                                    )}
+                                        <button
+                                            className="w-full flex items-center gap-4 p-4 rounded-md border border-zinc-700 bg-zinc-800/50 hover:bg-zinc-800 text-zinc-300 transition-colors"
+                                            onClick={handleSkipChoice}
+                                        >
+                                            <span className="text-2xl">⏭️</span>
+                                            <div className="text-left">
+                                                <p className="font-medium text-zinc-200">I skipped it</p>
+                                                <p className="text-sm text-zinc-500">Didn't get to it this time</p>
+                                            </div>
+                                        </button>
 
-                                    <div className="flex gap-2 pt-3">
-                                        <Button
-                                            variant="outline"
-                                            className="flex-1 border-zinc-700"
-                                            onClick={() => setResolveStep('choice')}
-                                        >
-                                            Back
-                                        </Button>
-                                        <Button
-                                            className="flex-1 bg-zinc-700 hover:bg-zinc-600"
-                                            disabled={!skipReason || (skipReason === 'other' && !otherReason.trim())}
-                                            onClick={handleSkipSubmit}
-                                        >
-                                            Save
-                                        </Button>
-                                    </div>
-                                </CardContent>
-                            </>
-                        )}
-                    </Card>
-                </div>
-            )}
+                                        <div className="pt-3">
+                                            <Button
+                                                variant="ghost"
+                                                className="w-full text-zinc-500 hover:text-zinc-300"
+                                                onClick={() => setResolveBlockId(null)}
+                                            >
+                                                Cancel
+                                            </Button>
+                                        </div>
+                                    </CardContent>
+                                </>
+                            ) : (
+                                <>
+                                    <CardHeader>
+                                        <CardTitle className="text-lg">Why did you skip?</CardTitle>
+                                        <CardDescription>
+                                            This helps identify patterns for better planning
+                                        </CardDescription>
+                                    </CardHeader>
+                                    <CardContent className="space-y-3">
+                                        {SKIP_REASONS.map((reason) => (
+                                            <button
+                                                key={reason.value}
+                                                className={cn(
+                                                    "w-full flex items-center gap-3 p-3 rounded-md border transition-colors text-left",
+                                                    skipReason === reason.value
+                                                        ? "border-white/30 bg-zinc-800"
+                                                        : "border-zinc-700 bg-zinc-800/50 hover:bg-zinc-800"
+                                                )}
+                                                onClick={() => setSkipReason(reason.value)}
+                                            >
+                                                <span className="text-xl">{reason.emoji}</span>
+                                                <span className="text-zinc-200">{reason.label}</span>
+                                            </button>
+                                        ))}
+
+                                        {skipReason === 'other' && (
+                                            <Textarea
+                                                placeholder="What happened?"
+                                                value={otherReason}
+                                                onChange={(e) => setOtherReason(e.target.value)}
+                                                className="mt-2 bg-zinc-800 border-zinc-700"
+                                            />
+                                        )}
+
+                                        <div className="flex gap-2 pt-3">
+                                            <Button
+                                                variant="outline"
+                                                className="flex-1 border-zinc-700"
+                                                onClick={() => setResolveStep('choice')}
+                                            >
+                                                Back
+                                            </Button>
+                                            <Button
+                                                className="flex-1 bg-zinc-700 hover:bg-zinc-600"
+                                                disabled={!skipReason || (skipReason === 'other' && !otherReason.trim())}
+                                                onClick={handleSkipSubmit}
+                                            >
+                                                Save
+                                            </Button>
+                                        </div>
+                                    </CardContent>
+                                </>
+                            )}
+                        </Card>
+                    </div>
+                )
+            }
         </div>
     )
 }

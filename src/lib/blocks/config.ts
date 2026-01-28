@@ -142,7 +142,7 @@ export function getBlockStatus(
     },
     session?: {
         outcome?: string | null
-        started_at?: string | null
+        actual_start?: string | null
     } | null,
     now: Date = new Date()
 ): BlockStatusInfo {
@@ -203,7 +203,7 @@ export function getBlockStatus(
     }
 
     // Has started but no outcome yet = active
-    if (session?.started_at) {
+    if (session?.actual_start) {
         return {
             status: 'active',
             label: 'In Progress',

@@ -7,7 +7,123 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { useCalendar } from '@/lib/hooks/useCalendar'
+import { useBlockColorPreferences, BLOCK_COLORS, type BlockColor, getBlockColorClass } from '@/lib/hooks/useBlockColorPreferences'
 import { createClient } from '@/lib/supabase/client'
+import { cn } from '@/lib/utils'
+
+// Color swatch component
+function ColorSwatch({
+    color,
+    isSelected,
+    onClick
+}: {
+    color: typeof BLOCK_COLORS[number]
+    isSelected: boolean
+    onClick: () => void
+}) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            className={cn(
+                "h-8 w-8 rounded-md transition-all duration-150",
+                color.class,
+                isSelected
+                    ? "ring-2 ring-white ring-offset-2 ring-offset-zinc-900 scale-110"
+                    : "hover:scale-105 hover:ring-1 hover:ring-zinc-500"
+            )}
+            title={color.label}
+        />
+    )
+}
+
+// Block preview component
+function BlockPreview({
+    label,
+    colorClass
+}: {
+    label: string
+    colorClass: string
+}) {
+    return (
+        <div className={cn(
+            "flex items-center gap-3 rounded-lg border border-zinc-700/50 bg-zinc-800/50 p-3",
+            "border-l-4",
+            colorClass
+        )}>
+            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-zinc-700/50 text-sm">
+                🎯
+            </div>
+            <div className="flex-1">
+                <p className="text-sm font-medium text-white">{label}</p>
+                <p className="text-xs text-zinc-500">Sample block preview</p>
+            </div>
+        </div>
+    )
+}
+
+
+// Appearance Section Component
+function AppearanceSection() {
+    const { preferences, isLoading, updatePreferences } = useBlockColorPreferences()
+
+    const handleColorChange = (colorValue: BlockColor) => {
+        updatePreferences.mutate({ manualBlockColor: colorValue })
+    }
+
+    return (
+        <Card className="border-zinc-800 bg-zinc-900/80 backdrop-blur-xl">
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                    <span>🎨</span> Appearance
+                </CardTitle>
+                <CardDescription>Customize how blocks are displayed</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+                {/* Manual Block Color */}
+                <div className="space-y-3">
+                    <div>
+                        <p className="font-medium text-white">Push To Start Blocks</p>
+                        <p className="text-sm text-zinc-500">
+                            Color for manually created blocks
+                        </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        {BLOCK_COLORS.map((color) => (
+                            <ColorSwatch
+                                key={color.value}
+                                color={color}
+                                isSelected={preferences.manualBlockColor === color.value}
+                                onClick={() => handleColorChange(color.value)}
+                            />
+                        ))}
+                    </div>
+                    <BlockPreview
+                        label="Push To Start Block"
+                        colorClass={getBlockColorClass(preferences.manualBlockColor)}
+                    />
+                </div>
+
+                <div className="border-t border-zinc-800" />
+
+                {/* Calendar Blocks Info */}
+                <div className="space-y-2">
+                    <p className="font-medium text-white">Calendar Blocks</p>
+                    <p className="text-sm text-zinc-500">
+                        Calendar-synced blocks automatically use their original calendar color from Google Calendar.
+                    </p>
+                </div>
+
+                {isLoading && (
+                    <p className="text-xs text-zinc-500 text-center">Loading preferences...</p>
+                )}
+                {updatePreferences.isPending && (
+                    <p className="text-xs text-emerald-400 text-center">Saving...</p>
+                )}
+            </CardContent>
+        </Card>
+    )
+}
 
 export default function SettingsPage() {
     const router = useRouter()
@@ -110,9 +226,85 @@ export default function SettingsPage() {
                                 )}
                             </div>
                             {isConnected && (
-                                <p className="mt-3 text-xs text-zinc-600">
-                                    Manage which calendars to sync from the Blocks page.
-                                </p>
+                                <>
+                                    <p className="mt-3 text-xs text-zinc-600">
+                                        Manage which calendars to sync from the Blocks page.
+                                    </p>
+                                    <div className="mt-4 flex flex-wrap gap-2 border-t border-zinc-800 pt-4">
+                                        {/* Push Button */}
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={async () => {
+                                                try {
+                                                    const response = await fetch('/api/calendar/push', { method: 'POST' })
+                                                    const data = await response.json()
+                                                    if (data.success) {
+                                                        alert(`✅ Pushed ${data.pushed} new blocks, updated ${data.updated} blocks to Google Calendar!`)
+                                                    } else if (data.error === 'Calendar not connected') {
+                                                        alert('❌ Calendar not connected.\n\nPlease connect your Google Calendar first.')
+                                                    } else if (response.status === 401 || data.error?.includes('Token') || data.error?.includes('scope')) {
+                                                        alert('❌ Calendar permissions need to be updated.\n\nPlease disconnect and reconnect your Google Calendar to grant write permissions.\n\nGo to Google Account → Security → Third-party apps → Remove "Push To Start", then reconnect here.')
+                                                    } else {
+                                                        alert(`❌ Failed to push: ${data.error}\n\nIf this persists, try disconnecting and reconnecting your Google Calendar.`)
+                                                    }
+                                                } catch {
+                                                    alert('❌ Failed to push blocks to calendar.\n\nPlease try disconnecting and reconnecting your Google Calendar.')
+                                                }
+                                            }}
+                                            className="border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
+                                        >
+                                            <svg className="mr-1.5 h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                                            </svg>
+                                            Push Blocks
+                                        </Button>
+
+                                        {/* Reconnect Button */}
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={connectCalendar}
+                                            className="border-blue-500/30 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20"
+                                        >
+                                            <svg className="mr-1.5 h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                            </svg>
+                                            Reconnect
+                                        </Button>
+
+                                        {/* Disconnect Button */}
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={async () => {
+                                                if (!confirm('Are you sure you want to disconnect Google Calendar?\n\nYou will need to reconnect to sync events again.')) return
+                                                try {
+                                                    const supabase = createClient()
+                                                    const { data: { user } } = await supabase.auth.getUser()
+                                                    if (user) {
+                                                        await supabase.from('profiles').update({
+                                                            google_calendar_connected: false,
+                                                            google_calendar_token: null,
+                                                            google_calendar_refresh_token: null,
+                                                            google_calendar_token_expires: null,
+                                                            push_calendar_id: null,
+                                                        }).eq('id', user.id)
+                                                        window.location.reload()
+                                                    }
+                                                } catch {
+                                                    alert('❌ Failed to disconnect calendar.')
+                                                }
+                                            }}
+                                            className="border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20"
+                                        >
+                                            <svg className="mr-1.5 h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                            Disconnect
+                                        </Button>
+                                    </div>
+                                </>
                             )}
                         </CardContent>
                     </Card>
@@ -144,6 +336,9 @@ export default function SettingsPage() {
                             </div>
                         </CardContent>
                     </Card>
+
+                    {/* Appearance */}
+                    <AppearanceSection />
 
                     {/* Notifications */}
                     <Card className="border-zinc-800 bg-zinc-900/80 backdrop-blur-xl">

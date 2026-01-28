@@ -38,6 +38,7 @@ export function useCalendar() {
     const queryClient = useQueryClient()
     const [syncedCalendarIds, setSyncedCalendarIds] = useState<string[]>([])
     const [lastCalendarSync, setLastCalendarSync] = useState<string | null>(null)
+    const [pushCalendarId, setPushCalendarId] = useState<string | null>(null)
 
     // Load synced calendar IDs and last sync time from profile
     useEffect(() => {
@@ -47,7 +48,7 @@ export function useCalendar() {
 
             const { data: profile } = await supabase
                 .from('profiles')
-                .select('synced_calendar_ids, last_calendar_sync')
+                .select('synced_calendar_ids, last_calendar_sync, push_calendar_id')
                 .eq('id', user.id)
                 .single()
 
@@ -56,6 +57,9 @@ export function useCalendar() {
             }
             if (profile?.last_calendar_sync) {
                 setLastCalendarSync(profile.last_calendar_sync)
+            }
+            if (profile?.push_calendar_id) {
+                setPushCalendarId(profile.push_calendar_id)
             }
         }
         loadSyncedCalendars()
@@ -183,10 +187,14 @@ export function useCalendar() {
 
     return {
         isConnected: calendarsQuery.data?.connected ?? false,
-        calendars: calendarsQuery.data?.calendars ?? [],
+        // Filter out the Push To Start calendar to prevent circular sync
+        calendars: (calendarsQuery.data?.calendars ?? []).filter(cal => cal.id !== pushCalendarId),
+        // Also provide the raw list for color lookups (includes push calendar)
+        allCalendars: calendarsQuery.data?.calendars ?? [],
         events: eventsQuery.data?.events ?? [],
         syncedCalendarIds,
         lastCalendarSync,
+        pushCalendarId,
         isCalendarSynced,
         toggleCalendar: toggleCalendar.mutate,
         isTogglingCalendar: toggleCalendar.isPending,
