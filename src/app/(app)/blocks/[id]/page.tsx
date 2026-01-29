@@ -73,8 +73,13 @@ export default function BlockDetailPage() {
                 .limit(1)
                 .single()
 
-            if (sessionData) {
-                setSession(sessionData)
+            if (sessionData && sessionData.actual_start) {
+                setSession({
+                    id: sessionData.id,
+                    actual_start: sessionData.actual_start,
+                    actual_end: sessionData.actual_end ?? undefined,
+                    time_to_start: sessionData.time_to_start ?? undefined,
+                })
             }
 
             setIsLoading(false)
@@ -204,16 +209,6 @@ export default function BlockDetailPage() {
                                     {block.calendar_id && (
                                         <Badge variant="outline" className="border-blue-500/20 bg-blue-500/10 text-blue-400 text-xs">
                                             📅 Calendar
-                                        </Badge>
-                                    )}
-                                    {block.status && (
-                                        <Badge variant="outline" className={cn(
-                                            "text-xs",
-                                            block.status === 'completed' && "border-emerald-500/20 bg-emerald-500/10 text-emerald-400",
-                                            block.status === 'skipped' && "border-amber-500/20 bg-amber-500/10 text-amber-400",
-                                            block.status === 'missed' && "border-red-500/20 bg-red-500/10 text-red-400",
-                                        )}>
-                                            {block.status}
                                         </Badge>
                                     )}
                                 </div>
