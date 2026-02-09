@@ -15,7 +15,7 @@ import {
 } from '@dnd-kit/core'
 import { useDraggable } from '@dnd-kit/core'
 import { restrictToVerticalAxis, restrictToFirstScrollableAncestor } from '@dnd-kit/modifiers'
-import { GripVertical } from 'lucide-react'
+import { GripVertical, Pencil } from 'lucide-react'
 
 interface DisplayBlock {
     id: string
@@ -134,10 +134,7 @@ function DraggableBlock({ block, style, manualColor, blockCalendarColor, onBlock
                     </div>
                 )}
 
-                <button
-                    onClick={() => onBlockClick?.(block.id)}
-                    className="flex-1 min-w-0 text-left h-full"
-                >
+                <div className="flex-1 min-w-0 h-full">
                     <div className="flex items-center gap-1.5 text-white">
                         {config?.icon && <config.icon className="h-3 w-3 shrink-0" />}
                         <span className="truncate text-xs font-medium">{block.title}</span>
@@ -149,6 +146,18 @@ function DraggableBlock({ block, style, manualColor, blockCalendarColor, onBlock
                             hour12: true,
                         })}
                     </p>
+                </div>
+
+                {/* Edit Button */}
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation()
+                        onBlockClick?.(block.id)
+                    }}
+                    className="p-1 hover:bg-white/20 rounded text-white/60 hover:text-white transition-colors"
+                    title="Edit block"
+                >
+                    <Pencil className="h-3 w-3" />
                 </button>
             </div>
         </div>
@@ -396,11 +405,10 @@ export function CalendarView({ blocks, viewMode, onBlockClick, onBlockUpdate, co
                             const blockCalendarColor = block.source === 'calendar' ? getCalendarColorById(block.calendar_id) : undefined
 
                             return (
-                                <button
+                                <div
                                     key={block.id}
-                                    onClick={() => onBlockClick?.(block.id)}
                                     className={cn(
-                                        "absolute rounded px-1 py-0.5 text-left transition-all hover:ring-1 hover:ring-white/30",
+                                        "absolute rounded p-1 text-left transition-all hover:ring-1 hover:ring-white/30",
                                         block.source === 'manual' && getBlockColor(block.type),
                                         "overflow-hidden border-l-2",
                                         block.source === 'manual' && getBlockColorClass(manualColor)
@@ -413,11 +421,25 @@ export function CalendarView({ blocks, viewMode, onBlockClick, onBlockUpdate, co
                                         } : {})
                                     }}
                                 >
-                                    <div className="flex items-center gap-1 text-white leading-tight">
-                                        {config?.icon && <config.icon className="h-2.5 w-2.5 shrink-0" />}
-                                        <span className="truncate text-[10px] font-medium">{block.title}</span>
+                                    <div className="flex items-start h-full gap-0.5">
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-1 text-white leading-tight">
+                                                {config?.icon && <config.icon className="h-2.5 w-2.5 shrink-0" />}
+                                                <span className="truncate text-[10px] font-medium">{block.title}</span>
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                onBlockClick?.(block.id)
+                                            }}
+                                            className="p-0.5 hover:bg-white/20 rounded text-white/60 hover:text-white transition-colors"
+                                            title="Edit block"
+                                        >
+                                            <Pencil className="h-2 w-2" />
+                                        </button>
                                     </div>
-                                </button>
+                                </div>
                             )
                         })
                     })}
