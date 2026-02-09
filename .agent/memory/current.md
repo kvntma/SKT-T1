@@ -1,27 +1,27 @@
 # Current Work Memory
-Last updated: 2026-02-08 16:10 local
+Last updated: 2026-02-08 16:30 local
 
-Ticket: SKT-13
+Ticket: SKT-12
 Branch: master
 
 ## Summary
-- Implemented SKT-13: Edit completed blocks and session details.
-- Added session state fields and UI for outcome, abort reason, and resume token in `src/app/(app)/blocks/[id]/page.tsx`.
-- Updated `handleSave` in `[id]/page.tsx` to persist changes to the `sessions` table.
-- Enabled the "Edit" button for both manual and calendar blocks in `src/app/(app)/blocks/page.tsx` when they have a completed/stopped/skipped status.
+- Finished SKT-13: Session details can now be edited.
+- Starting SKT-12: Handle page refresh mid-session.
+- Goal: If a user refreshes the `/now` page, detect an active session in Supabase and restore the timer/block state.
 
 ## Decisions (Do Not Re-litigate)
-- **Session Editing:** Users can now modify outcome, reason, and next steps for any block that has an associated session.
-- **Edit Accessibility:** The edit button is now available for calendar-synced blocks that have been executed or resolved.
+- **Restoration Source:** Use Supabase `sessions` table as the source of truth for active sessions.
+- **Trigger:** Check for active sessions on `/now` page mount.
+- **Persistence:** Local timer state (`elapsedSeconds`) will be re-calculated from `actual_start`.
 
 ## Current State
-- SKT-13 implementation complete and ready for testing.
-- Manual and calendar blocks now share the same editing capabilities once a session exists.
+- SKT-13 implemented and committed.
+- `now/page.tsx` resets state on refresh.
 
 ## Open Questions / Risks
-- None.
+- What if multiple "active" sessions exist? (Will take the most recent one).
 
 ## Next Steps
-- [ ] Commit implementation changes.
-- [ ] Verify session editing works correctly in the browser.
-- [ ] Move to the next priority ticket.
+- [ ] Add `restoreSession` action to `execution-store.ts`.
+- [ ] Implement active session detection in `now/page.tsx`.
+- [ ] Verify timer resumes correctly after refresh.
