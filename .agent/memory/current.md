@@ -1,30 +1,30 @@
 # Current Work Memory
-Last updated: 2026-02-08 18:00 local
+Last updated: 2026-02-08 18:15 local
 
 Ticket: SKT-11
 Branch: master
 
 ## Summary
-- Fixed timer reset bug (SKT-23).
 - Completed SKT-11: Show previous resume token on block load.
-    - Added `useLastSession` query to `useSession.ts`.
-    - Integrated "Last Action" display in `now/page.tsx` when no current stop condition is present.
-- Verified build integrity: ✅ Success.
+- Fixed [Bug] /now page timer shows 17000+ minutes (SKT-23).
+- Resolved build errors and "not defined" variable issues:
+    - Added `reset` and `lastSession` to destructuring in `now/page.tsx`.
+    - Restored `activeId` state and `useState` import in `calendar-view.tsx`.
+    - Verified build integrity: ✅ Success.
 
 ## Decisions (Do Not Re-litigate)
 - **Git Sync:** Mandatory immediate Git Commit + Push for `.agent/memory`.
-- **State Cleanup:** Always call `reset()` in execution store before navigating away from `/now`.
-- **UI Priority:** Current "Stop Condition" always takes precedence over "Last Action".
+- **UI Logic:** Resume token only shows if current block has no stop condition and session hasn't started.
 
 ## Current State
-- Timer bug resolved.
-- Resume token feature functional.
 - Build passing.
+- SKT-11 and SKT-23 verified.
+- Memory synchronized.
 
 ## Open Questions / Risks
-- None.
+- Browser cache might need a hard refresh if "not defined" errors persist despite code fixes.
 
 ## Next Steps
-- [x] Implement SKT-11.
-- [x] Fix SKT-23.
-- [ ] Run `grab-ticket` for the next objective.
+- [x] Fix "lastSession is not defined" error.
+- [x] Fix "setActiveId is not defined" error.
+- [ ] Monitor for any runtime issues with resume token data.

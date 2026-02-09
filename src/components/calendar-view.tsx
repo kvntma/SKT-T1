@@ -7,7 +7,6 @@ import { type BlockColorPreferences, getBlockColorClass } from '@/lib/hooks/useB
 import {
     DndContext,
     DragEndEvent,
-    DragOverlay,
     DragStartEvent,
     PointerSensor,
     useSensor,
@@ -169,8 +168,8 @@ export function CalendarView({ blocks, viewMode, onBlockClick, onBlockUpdate, co
         return calendar?.color
     }
 
-    const now = new Date()
-    const weekDays = useMemo(() => getWeekDays(now), [])
+    const now = useMemo(() => new Date(), [])
+    const weekDays = useMemo(() => getWeekDays(now), [now])
 
     const getBlockStyle = (block: DisplayBlock, dayIndex?: number) => {
         const start = new Date(block.planned_start)
@@ -239,7 +238,7 @@ export function CalendarView({ blocks, viewMode, onBlockClick, onBlockUpdate, co
     }
 
     // Custom snapping modifier
-    const snapModifier = ({ transform }: { transform: any }) => {
+    const snapModifier = ({ transform }: { transform: { x: number; y: number; scaleX: number; scaleY: number } }) => {
         return {
             ...transform,
             y: Math.round(transform.y / SNAP_STEP) * SNAP_STEP,

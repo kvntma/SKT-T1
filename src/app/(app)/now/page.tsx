@@ -39,8 +39,8 @@ function getBlockTypeColor(type: string): string {
 export default function NowPage() {
     const { data: currentBlock, isLoading: currentBlockLoading } = useCurrentBlock()
     const { blocks, isLoading: blocksLoading } = useBlocks()
-    const { isRunning, elapsedSeconds, startTimer, stopTimer, resumeTimer, tick, setCurrentBlock, restoreSession } = useExecutionStore()
-    const { startSession, abandonSession, resumeSession, endSession } = useSession()
+    const { isRunning, elapsedSeconds, startTimer, stopTimer, resumeTimer, tick, setCurrentBlock, restoreSession, reset } = useExecutionStore()
+    const { startSession, abandonSession, resumeSession, endSession, lastSession } = useSession()
     const [mounted, setMounted] = useState(false)
     const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
     const blockStartTimeRef = useRef<Date | null>(null)
