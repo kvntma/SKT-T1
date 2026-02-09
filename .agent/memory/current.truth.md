@@ -1,23 +1,23 @@
 # Current Truth Memory
-Last updated: 2026-02-08 15:55 local
+Last updated: 2026-02-08 16:45 local
 
 ## Key Decisions
-- **Workflow:** Ralph Workflow with mandatory Git commits for `.agent/memory` updates.
-- **Persistence:** All agent state and plans must be committed to Git history.
-- **SKT-13:** Edit session details for completed blocks.
+- **Workflow:** Ralph Workflow with mandatory Git Commit + Push for `.agent/memory` updates.
+- **Persistence:** Agent state is synchronized remotely to support multi-agent/multi-machine context.
+- **SKT-13:** Block details and sessions are now fully editable.
 
 ## Architecture & Constraints
 - **Tailwind Dynamic Colors:** Static lookup map only.
-- **Session Outcomes:** ['done', 'aborted', 'skipped', 'abandoned'].
+- **Session Restoration:** Restored via DB check on page mount (`outcome IS NULL`).
 
-## Active Ticket: SKT-13
-- Goal: Enable editing of session details in block detail page.
+## Active Ticket: SKT-12
+- Goal: Maintain execution state across page refreshes.
 
 ## TODO
-- [ ] Implement session editing in `[id]/page.tsx`
-- [ ] Enable edit button for all completed blocks in `blocks/page.tsx`
+- [ ] Implement session detection in `now/page.tsx`.
+- [ ] Verify full restoration flow (Block + Timer).
 
 ## Key Files
-- `.agent/workflows/*.md`
+- `src/lib/stores/execution-store.ts`
+- `src/app/(app)/now/page.tsx`
 - `src/app/(app)/blocks/[id]/page.tsx`
-- `src/app/(app)/blocks/page.tsx`

@@ -32,7 +32,7 @@ Periodically compress session summaries into a tight "current truth" file.
 ## Rules of Engagement
 
 - **Persistence:** Always write to `.agent/memory/` files. Never rely solely on chat history.
-- **Git Sync:** Whenever a memory file is updated, it MUST be committed immediately with a clear message (e.g., "chore(agent): update memory for SKT-13").
+- **Git Sync:** Whenever a memory file is updated, it MUST be committed and pushed immediately with a clear message (e.g., "chore(agent): update memory for SKT-13").
 - **Context:** If `current.md` is missing or stale, start with `grab-ticket`.
 - **Transparency:** Always output the "Next Steps" checklist after a summary.
 - **Cleanliness:** Keep memory files concise. Use bullets.

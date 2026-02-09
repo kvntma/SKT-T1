@@ -1,27 +1,27 @@
 # Current Work Memory
-Last updated: 2026-02-08 16:30 local
+Last updated: 2026-02-08 16:45 local
 
 Ticket: SKT-12
 Branch: master
 
 ## Summary
-- Finished SKT-13: Session details can now be edited.
-- Starting SKT-12: Handle page refresh mid-session.
-- Goal: If a user refreshes the `/now` page, detect an active session in Supabase and restore the timer/block state.
+- Shifted to "commit and push" strategy for all `.agent/memory` updates to ensure remote sync.
+- Completed SKT-13: Session details can now be edited and saved.
+- Working on SKT-12: Handle page refresh mid-session.
+- Added `restoreSession` action to `execution-store.ts`.
 
 ## Decisions (Do Not Re-litigate)
-- **Restoration Source:** Use Supabase `sessions` table as the source of truth for active sessions.
-- **Trigger:** Check for active sessions on `/now` page mount.
-- **Persistence:** Local timer state (`elapsedSeconds`) will be re-calculated from `actual_start`.
+- **Git Sync:** All memory updates MUST be committed and pushed immediately.
+- **Restoration:** Supabase is the source of truth for resuming active sessions on refresh.
 
 ## Current State
-- SKT-13 implemented and committed.
-- `now/page.tsx` resets state on refresh.
+- `execution-store.ts` updated with `restoreSession`.
+- Ready to implement detection logic in `now/page.tsx`.
 
 ## Open Questions / Risks
-- What if multiple "active" sessions exist? (Will take the most recent one).
+- Ensure `git push` works without interactive prompts in this environment.
 
 ## Next Steps
-- [ ] Add `restoreSession` action to `execution-store.ts`.
-- [ ] Implement active session detection in `now/page.tsx`.
+- [ ] Commit and Push these workflow/memory updates.
+- [ ] Implement active session detection in `src/app/(app)/now/page.tsx`.
 - [ ] Verify timer resumes correctly after refresh.

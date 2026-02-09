@@ -31,8 +31,8 @@ description: Update the memory file for the active ticket (progress, decisions, 
   - Top 3 next steps
   - Link/path to the ticket memory file
 
-6) Commit memory changes
-- Run `git add .agent/memory/ && git commit -m "chore(agent): update ticket memory for <TICKET_ID>"`
+6) Commit and Push memory changes
+- Run `git add .agent/memory/ && git commit -m "chore(agent): update ticket memory for <TICKET_ID>" && git push`
 
 7) Output in chat
 - Confirm files updated

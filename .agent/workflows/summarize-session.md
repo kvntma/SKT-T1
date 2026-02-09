@@ -46,7 +46,7 @@ Write a compact summary with these sections:
 - Always write/update: `.agent/memory/current.md`
 - Also write/update per ticket when available:
   - `.agent/memory/tickets/<TICKET_ID>.md` (skip if `NO_TICKET`)
-- **Commit memory files:** Run `git add .agent/memory/ && git commit -m "chore(agent): update session memory"`
+- **Commit and Push memory files:** Run `git add .agent/memory/ && git commit -m "chore(agent): update session memory" && git push`
 
 5) Keep memory files from bloating
 - If `.agent/memory/current.md` exceeds ~250 lines:
