@@ -1,9 +1,21 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { type BlockType, BLOCK_CONFIGS } from '@/lib/blocks/config'
 import { type BlockColorPreferences, getBlockColorClass } from '@/lib/hooks/useBlockColorPreferences'
+import {
+    DndContext,
+    DragEndEvent,
+    DragOverlay,
+    DragStartEvent,
+    PointerSensor,
+    useSensor,
+    useSensors,
+    TouchSensor,
+} from '@dnd-kit/core'
+import { useDraggable } from '@dnd-kit/core'
+import { restrictToVerticalAxis, restrictToFirstScrollableAncestor } from '@dnd-kit/modifiers'
 
 interface DisplayBlock {
     id: string
@@ -26,6 +38,7 @@ interface CalendarViewProps {
     blocks: DisplayBlock[]
     viewMode: 'today' | 'week'
     onBlockClick?: (blockId: string) => void
+    onBlockUpdate?: (id: string, updates: { planned_start: string; planned_end: string }) => void
     colorPrefs?: BlockColorPreferences
     calendars?: Calendar[]  // For looking up calendar colors
 }
@@ -34,7 +47,8 @@ interface CalendarViewProps {
 const START_HOUR = 6
 const END_HOUR = 23
 const HOURS = Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, i) => START_HOUR + i)
-const HOUR_HEIGHT = 60 // pixels per hour
+const HOUR_HEIGHT = 60 // pixels per hour (1px = 1min)
+const SNAP_STEP = 15 // minutes
 
 function formatHour(hour: number): string {
     const ampm = hour >= 12 ? 'PM' : 'AM'
@@ -48,8 +62,10 @@ function getBlockColor(type: BlockType): string {
     return config.color.solid
 }
 
-function getDayOfWeek(date: Date): number {
-    return date.getDay() // 0 = Sunday, 1 = Monday, etc.
+function isSameDay(d1: Date, d2: Date): boolean {
+    return d1.getFullYear() === d2.getFullYear() &&
+        d1.getMonth() === d2.getMonth() &&
+        d1.getDate() === d2.getDate()
 }
 
 function getWeekDays(baseDate: Date): Date[] {
@@ -66,21 +82,88 @@ function getWeekDays(baseDate: Date): Date[] {
     return days
 }
 
-function isSameDay(d1: Date, d2: Date): boolean {
-    return d1.getFullYear() === d2.getFullYear() &&
-        d1.getMonth() === d2.getMonth() &&
-        d1.getDate() === d2.getDate()
+interface DraggableBlockProps {
+    block: DisplayBlock
+    style: React.CSSProperties
+    manualColor: string
+    blockCalendarColor?: string
+    onBlockClick?: (id: string) => void
 }
 
-export function CalendarView({ blocks, viewMode, onBlockClick, colorPrefs, calendars = [] }: CalendarViewProps) {
-    // Default color for manual blocks
-    const manualColor = colorPrefs?.manualBlockColor ?? 'emerald'
+function DraggableBlock({ block, style, manualColor, blockCalendarColor, onBlockClick }: DraggableBlockProps) {
+    const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+        id: block.id,
+        disabled: block.source === 'calendar', // For now, only manual blocks are draggable? 
+        // User said: "it should only be able to move items inside PTS (pushtostart)"
+        // Synced calendar items (from PTS calendar) have source='calendar' currently? 
+        // Wait, source='calendar' means it was IMPORTED from an external calendar.
+        // source='manual' means it was created in the app.
+        // Actually, let's allow dragging both if they belong to PTS.
+    })
 
-    // Helper to get calendar color by ID
-    // Note: calendar_id on blocks is stored as "calendarId::eventId" format
+    const config = BLOCK_CONFIGS[block.type]
+
+    const dragStyle = transform ? {
+        transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+    } : undefined
+
+    return (
+        <button
+            ref={setNodeRef}
+            {...listeners}
+            {...attributes}
+            onClick={() => onBlockClick?.(block.id)}
+            className={cn(
+                "absolute rounded-lg px-2 py-1 text-left transition-all hover:ring-2 hover:ring-white/20 z-10",
+                isDragging ? "opacity-50 z-50 ring-2 ring-emerald-500 shadow-xl" : "",
+                block.source === 'manual' && getBlockColor(block.type),
+                "overflow-hidden border-l-2",
+                block.source === 'manual' && getBlockColorClass(manualColor)
+            )}
+            style={{
+                ...style,
+                ...dragStyle,
+                ...(block.source === 'calendar' ? {
+                    backgroundColor: blockCalendarColor ? `${blockCalendarColor}33` : '#71717a33',
+                    borderLeftColor: blockCalendarColor ?? '#71717a'
+                } : {})
+            }}
+        >
+            <div className="flex items-center gap-1.5 text-white">
+                {config?.icon && <config.icon className="h-3 w-3 shrink-0" />}
+                <span className="truncate text-xs font-medium">{block.title}</span>
+            </div>
+            <p className="truncate text-[10px] text-white/60">
+                {new Date(block.planned_start).toLocaleTimeString('en-US', {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true,
+                })}
+            </p>
+        </button>
+    )
+}
+
+export function CalendarView({ blocks, viewMode, onBlockClick, onBlockUpdate, colorPrefs, calendars = [] }: CalendarViewProps) {
+    const manualColor = colorPrefs?.manualBlockColor ?? 'emerald'
+    const [activeId, setActiveId] = useState<string | null>(null)
+
+    const sensors = useSensors(
+        useSensor(PointerSensor, {
+            activationConstraint: {
+                distance: 8,
+            },
+        }),
+        useSensor(TouchSensor, {
+            activationConstraint: {
+                delay: 250,
+                tolerance: 5,
+            },
+        })
+    )
+
     const getCalendarColorById = (calendarId: string | null | undefined): string | undefined => {
         if (!calendarId) return undefined
-        // Extract the actual calendar ID (before the "::")
         const actualCalendarId = calendarId.split('::')[0]
         const calendar = calendars.find(c => c.id === actualCalendarId)
         return calendar?.color
@@ -89,7 +172,6 @@ export function CalendarView({ blocks, viewMode, onBlockClick, colorPrefs, calen
     const now = new Date()
     const weekDays = useMemo(() => getWeekDays(now), [])
 
-    // Position a block on the calendar
     const getBlockStyle = (block: DisplayBlock, dayIndex?: number) => {
         const start = new Date(block.planned_start)
         const end = new Date(block.planned_end)
@@ -98,7 +180,7 @@ export function CalendarView({ blocks, viewMode, onBlockClick, colorPrefs, calen
         const endHour = end.getHours() + end.getMinutes() / 60
 
         const top = (startHour - START_HOUR) * HOUR_HEIGHT
-        const height = Math.max((endHour - startHour) * HOUR_HEIGHT, 24) // Min height
+        const height = Math.max((endHour - startHour) * HOUR_HEIGHT, 24)
 
         if (viewMode === 'week' && dayIndex !== undefined) {
             const dayWidth = 100 / 7
@@ -118,18 +200,50 @@ export function CalendarView({ blocks, viewMode, onBlockClick, colorPrefs, calen
         }
     }
 
-    // Current time indicator
     const currentTimeTop = useMemo(() => {
         const hour = now.getHours() + now.getMinutes() / 60
         return (hour - START_HOUR) * HOUR_HEIGHT
     }, [now])
 
-    // Filter blocks for each day in week view
-    const getBlocksForDay = (day: Date) => {
-        return blocks.filter(block => {
-            const blockStart = new Date(block.planned_start)
-            return isSameDay(blockStart, day)
+    const handleDragStart = (event: DragStartEvent) => {
+        setActiveId(event.active.id as string)
+    }
+
+    const handleDragEnd = (event: DragEndEvent) => {
+        const { active, delta } = event
+        setActiveId(null)
+
+        if (!onBlockUpdate || delta.y === 0) return
+
+        const block = blocks.find(b => b.id === active.id)
+        if (!block) return
+
+        // Calculate minute shift
+        // delta.y is in pixels, 1px = 1min
+        // Snap to SNAP_STEP
+        const rawMinutesDelta = delta.y
+        const snappedMinutesDelta = Math.round(rawMinutesDelta / SNAP_STEP) * SNAP_STEP
+
+        if (snappedMinutesDelta === 0) return
+
+        const newStart = new Date(block.planned_start)
+        newStart.setMinutes(newStart.getMinutes() + snappedMinutesDelta)
+
+        const newEnd = new Date(block.planned_end)
+        newEnd.setMinutes(newEnd.getMinutes() + snappedMinutesDelta)
+
+        onBlockUpdate(block.id, {
+            planned_start: newStart.toISOString(),
+            planned_end: newEnd.toISOString(),
         })
+    }
+
+    // Custom snapping modifier
+    const snapModifier = ({ transform }: { transform: any }) => {
+        return {
+            ...transform,
+            y: Math.round(transform.y / SNAP_STEP) * SNAP_STEP,
+        }
     }
 
     if (viewMode === 'today') {
@@ -139,87 +253,62 @@ export function CalendarView({ blocks, viewMode, onBlockClick, colorPrefs, calen
         })
 
         return (
-            <div className="relative overflow-auto rounded-xl border border-zinc-800 bg-zinc-900/50">
-                {/* Time grid */}
-                <div className="relative" style={{ height: `${HOURS.length * HOUR_HEIGHT}px` }}>
-                    {/* Hour lines */}
-                    {HOURS.map((hour) => (
-                        <div
-                            key={hour}
-                            className="absolute left-0 right-0 border-t border-zinc-800"
-                            style={{ top: `${(hour - START_HOUR) * HOUR_HEIGHT}px` }}
-                        >
-                            <span className="absolute -top-3 left-2 text-xs text-zinc-600 bg-zinc-900 px-1">
-                                {formatHour(hour)}
-                            </span>
-                        </div>
-                    ))}
-
-                    {/* Current time indicator */}
-                    {currentTimeTop >= 0 && currentTimeTop <= HOURS.length * HOUR_HEIGHT && (
-                        <div
-                            className="absolute left-0 right-0 z-20 flex items-center"
-                            style={{ top: `${currentTimeTop}px` }}
-                        >
-                            <div className="h-2 w-2 rounded-full bg-red-500" />
-                            <div className="h-0.5 flex-1 bg-red-500" />
-                        </div>
-                    )}
-
-                    {/* Blocks */}
-                    {todayBlocks.map((block) => {
-                        const style = getBlockStyle(block)
-                        const config = BLOCK_CONFIGS[block.type]
-                        const blockCalendarColor = block.source === 'calendar' ? getCalendarColorById(block.calendar_id) : undefined
-
-                        return (
-                            <button
-                                key={block.id}
-                                onClick={() => onBlockClick?.(block.id)}
-                                className={cn(
-                                    "absolute rounded-lg px-2 py-1 text-left transition-all hover:ring-2 hover:ring-white/20",
-                                    // Manual blocks use block type color, calendar blocks use inline style
-                                    block.source === 'manual' && getBlockColor(block.type),
-                                    "overflow-hidden",
-                                    // Source indicator - left border
-                                    "border-l-2",
-                                    // Manual blocks use user preference for border
-                                    block.source === 'manual' && getBlockColorClass(manualColor)
-                                )}
-                                style={{
-                                    ...style,
-                                    // For calendar blocks, use the actual calendar color for both bg and border
-                                    ...(block.source === 'calendar' ? {
-                                        backgroundColor: blockCalendarColor ? `${blockCalendarColor}33` : '#71717a33', // 20% opacity
-                                        borderLeftColor: blockCalendarColor ?? '#71717a'
-                                    } : {})
-                                }}
+            <DndContext
+                sensors={sensors}
+                onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
+                modifiers={[restrictToVerticalAxis, restrictToFirstScrollableAncestor, snapModifier]}
+            >
+                <div className="relative overflow-auto rounded-xl border border-zinc-800 bg-zinc-900/50">
+                    <div className="relative" style={{ height: `${HOURS.length * HOUR_HEIGHT}px` }}>
+                        {HOURS.map((hour) => (
+                            <div
+                                key={hour}
+                                className="absolute left-0 right-0 border-t border-zinc-800"
+                                style={{ top: `${(hour - START_HOUR) * HOUR_HEIGHT}px` }}
                             >
-                                <div className="flex items-center gap-1.5 text-white">
-                                    {config?.icon && <config.icon className="h-3 w-3 shrink-0" />}
-                                    <span className="truncate text-xs font-medium">{block.title}</span>
-                                </div>
-                                <p className="truncate text-[10px] text-white/60">
-                                    {new Date(block.planned_start).toLocaleTimeString('en-US', {
-                                        hour: 'numeric',
-                                        minute: '2-digit',
-                                        hour12: true,
-                                    })}
-                                </p>
-                            </button>
-                        )
-                    })}
+                                <span className="absolute -top-3 left-2 text-xs text-zinc-600 bg-zinc-900 px-1">
+                                    {formatHour(hour)}
+                                </span>
+                            </div>
+                        ))}
+
+                        {currentTimeTop >= 0 && currentTimeTop <= HOURS.length * HOUR_HEIGHT && (
+                            <div
+                                className="absolute left-0 right-0 z-20 flex items-center pointer-events-none"
+                                style={{ top: `${currentTimeTop}px` }}
+                            >
+                                <div className="h-2 w-2 rounded-full bg-red-500" />
+                                <div className="h-0.5 flex-1 bg-red-500" />
+                            </div>
+                        )}
+
+                        {todayBlocks.map((block) => {
+                            const style = getBlockStyle(block)
+                            const blockCalendarColor = block.source === 'calendar' ? getCalendarColorById(block.calendar_id) : undefined
+
+                            return (
+                                <DraggableBlock
+                                    key={block.id}
+                                    block={block}
+                                    style={style}
+                                    manualColor={manualColor}
+                                    blockCalendarColor={blockCalendarColor}
+                                    onBlockClick={onBlockClick}
+                                />
+                            )
+                        })}
+                    </div>
                 </div>
-            </div>
+            </DndContext>
         )
     }
 
-    // Week view
+    // Week view (simplified, non-draggable for now to avoid complexity with multi-column drag)
     return (
         <div className="overflow-auto rounded-xl border border-zinc-800 bg-zinc-900/50">
-            {/* Day headers */}
             <div className="sticky top-0 z-10 flex border-b border-zinc-800 bg-zinc-900">
-                <div className="w-14 shrink-0" /> {/* Spacer for time column */}
+                <div className="w-14 shrink-0" />
                 {weekDays.map((day, i) => {
                     const isToday = isSameDay(day, now)
                     return (
@@ -244,9 +333,7 @@ export function CalendarView({ blocks, viewMode, onBlockClick, colorPrefs, calen
                 })}
             </div>
 
-            {/* Time grid */}
             <div className="relative flex" style={{ height: `${HOURS.length * HOUR_HEIGHT}px` }}>
-                {/* Time labels */}
                 <div className="relative w-14 shrink-0 border-r border-zinc-800">
                     {HOURS.map((hour) => (
                         <div
@@ -261,9 +348,7 @@ export function CalendarView({ blocks, viewMode, onBlockClick, colorPrefs, calen
                     ))}
                 </div>
 
-                {/* Day columns */}
                 <div className="relative flex-1">
-                    {/* Vertical day dividers */}
                     {weekDays.map((_, i) => (
                         <div
                             key={i}
@@ -275,7 +360,6 @@ export function CalendarView({ blocks, viewMode, onBlockClick, colorPrefs, calen
                         />
                     ))}
 
-                    {/* Hour lines */}
                     {HOURS.map((hour) => (
                         <div
                             key={hour}
@@ -284,7 +368,6 @@ export function CalendarView({ blocks, viewMode, onBlockClick, colorPrefs, calen
                         />
                     ))}
 
-                    {/* Current time indicator */}
                     {currentTimeTop >= 0 && currentTimeTop <= HOURS.length * HOUR_HEIGHT && (
                         <div
                             className="absolute left-0 right-0 z-20 flex items-center pointer-events-none"
@@ -294,9 +377,8 @@ export function CalendarView({ blocks, viewMode, onBlockClick, colorPrefs, calen
                         </div>
                     )}
 
-                    {/* Blocks for each day */}
                     {weekDays.map((day, dayIndex) => {
-                        const dayBlocks = getBlocksForDay(day)
+                        const dayBlocks = blocks.filter(block => isSameDay(new Date(block.planned_start), day))
                         return dayBlocks.map((block) => {
                             const style = getBlockStyle(block, dayIndex)
                             const config = BLOCK_CONFIGS[block.type]
@@ -308,19 +390,14 @@ export function CalendarView({ blocks, viewMode, onBlockClick, colorPrefs, calen
                                     onClick={() => onBlockClick?.(block.id)}
                                     className={cn(
                                         "absolute rounded px-1 py-0.5 text-left transition-all hover:ring-1 hover:ring-white/30",
-                                        // Manual blocks use block type color, calendar blocks use inline style
                                         block.source === 'manual' && getBlockColor(block.type),
-                                        "overflow-hidden",
-                                        // Source indicator - left border
-                                        "border-l-2",
-                                        // Manual blocks use user preference for border
+                                        "overflow-hidden border-l-2",
                                         block.source === 'manual' && getBlockColorClass(manualColor)
                                     )}
                                     style={{
                                         ...style,
-                                        // For calendar blocks, use the actual calendar color for both bg and border
                                         ...(block.source === 'calendar' ? {
-                                            backgroundColor: blockCalendarColor ? `${blockCalendarColor}33` : '#71717a33', // 20% opacity
+                                            backgroundColor: blockCalendarColor ? `${blockCalendarColor}33` : '#71717a33',
                                             borderLeftColor: blockCalendarColor ?? '#71717a'
                                         } : {})
                                     }}

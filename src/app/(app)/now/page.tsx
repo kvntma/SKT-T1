@@ -80,7 +80,7 @@ export default function NowPage() {
                     .is('outcome', null)
                     .order('actual_start', { ascending: false })
                     .limit(1)
-                    .single()
+                    .maybeSingle()
 
                 if (sessionData && !sessionError && sessionData.actual_start) {
                     const block = sessionData.blocks as unknown as Block

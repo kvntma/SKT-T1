@@ -16,6 +16,11 @@ interface CreateBlockParams {
     linear_issue_id?: string
 }
 
+interface UpdateBlockParams {
+    id: string
+    updates: Partial<CreateBlockParams>
+}
+
 type BlockView = 'today' | 'week'
 
 export function useBlocks(view: BlockView = 'today') {
@@ -94,6 +99,25 @@ export function useBlocks(view: BlockView = 'today') {
         },
     })
 
+    // Update an existing block
+    const updateBlock = useMutation({
+        mutationFn: async ({ id, updates }: UpdateBlockParams) => {
+            const { data, error } = await supabase
+                .from('blocks')
+                .update(updates)
+                .eq('id', id)
+                .select()
+                .single()
+
+            if (error) throw error
+            return data as Block
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['blocks'] })
+            queryClient.invalidateQueries({ queryKey: ['currentBlock'] })
+        },
+    })
+
     // Delete a block
     const deleteBlock = useMutation({
         mutationFn: async (blockId: string) => {
@@ -116,6 +140,7 @@ export function useBlocks(view: BlockView = 'today') {
         isLoading: blocksQuery.isLoading,
         error: blocksQuery.error,
         createBlock,
+        updateBlock,
         deleteBlock,
     }
 }

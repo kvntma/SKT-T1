@@ -50,7 +50,7 @@ export function useCalendar() {
                 .from('profiles')
                 .select('synced_calendar_ids, last_calendar_sync, push_calendar_id')
                 .eq('id', user.id)
-                .single()
+                .maybeSingle()
 
             if (profile?.synced_calendar_ids) {
                 setSyncedCalendarIds(profile.synced_calendar_ids)

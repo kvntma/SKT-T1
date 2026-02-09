@@ -371,6 +371,32 @@ Multi-user support (far future)
 
 Distraction blocking (OS-level)
 
+Phase 6 — Dynamic Scheduling & Orchestration (Refactor)
+6.7 Draggable Time-Grid
+
+Goal: Allow manual re-prioritization via direct manipulation.
+
+Requirements:
+- Blocks are draggable on the calendar/list view.
+- Dragging a block updates its planned_start and planned_end.
+- Supports both Manual and "Push To Start" (PTS) synced blocks.
+- Google Calendar "anchor" events remain fixed or provide visual collision warnings.
+
+6.8 AI Schedule Refactor ("Magic Button")
+
+Goal: Dynamically re-align the day based on actual progress and changing priorities.
+
+Capabilities:
+- Analyze current day's execution (skipped blocks, missed starts, overruns).
+- Propose a new schedule for the remaining PTS blocks.
+- Respect fixed Google Calendar events as unmovable anchors.
+- Provide a "Review & Commit" flow before applying changes to the DB.
+
+Rules:
+- AI only moves blocks within the PTS ecosystem.
+- Refactoring is user-triggered (button click).
+- AI accounts for "Recovery" needs and "Focus" durations based on PRD principles.
+
 PRD Extension — Linear Integration & Burndown Tracking
 12. Purpose of Linear Integration
 

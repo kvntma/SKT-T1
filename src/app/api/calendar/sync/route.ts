@@ -157,73 +157,53 @@ export async function POST(request: NextRequest) {
     // Filter to timed events only (skip all-day events)
     const timedEvents = allEvents.filter(event => event.start?.dateTime)
 
-    // Upsert blocks from calendar events
+    // Upsert blocks from calendar events in bulk
     console.log('[Calendar Sync] Processing events:', {
         totalEvents: allEvents.length,
         timedEvents: timedEvents.length,
         calendarsChecked: calendarIds.length,
     })
 
-    // Log sample of events for debugging
-    timedEvents.slice(0, 5).forEach((event, i) => {
-        console.log(`[Calendar Sync] Event ${i + 1}:`, {
-            id: event.id,
-            summary: event.summary,
-            visibility: event.visibility,
-            start: event.start?.dateTime,
+    if (timedEvents.length === 0) {
+        // Still update last sync timestamp
+        await supabase
+            .from('profiles')
+            .update({ last_calendar_sync: new Date().toISOString() })
+            .eq('id', user.id)
+
+        return NextResponse.json({
+            synced: true,
+            blockCount: 0,
+            totalEvents: 0,
+            calendarsChecked: calendarIds.length,
         })
-    })
+    }
 
-    let syncedCount = 0
-    const errors: string[] = []
+    // Prepare batch upsert data
+    // We omit 'type' to allow the DB default ('focus') for new rows 
+    // while preserving existing 'type' for updated rows
+    const upsertData = timedEvents.map(event => ({
+        user_id: user.id,
+        calendar_id: event.id,
+        title: event.summary || (event.visibility === 'private' ? 'Busy' : 'Untitled Event'),
+        planned_start: event.start.dateTime!,
+        planned_end: event.end.dateTime!,
+        task_link: event.htmlLink || null,
+    }))
 
-    for (const event of timedEvents) {
-        // Handle private/busy events gracefully
-        const title = event.summary || (event.visibility === 'private' ? 'Busy' : 'Untitled Event')
+    // Perform batch upsert
+    const { error: upsertError } = await supabase
+        .from('blocks')
+        .upsert(upsertData, { 
+            onConflict: 'user_id,calendar_id'
+        })
 
-        // Check if block already exists for this calendar event
-        const { data: existing } = await supabase
-            .from('blocks')
-            .select('id')
-            .eq('user_id', user.id)
-            .eq('calendar_id', event.id)
-            .single()
-
-        let error
-        if (existing) {
-            // Update existing block
-            const result = await supabase
-                .from('blocks')
-                .update({
-                    title,
-                    planned_start: event.start.dateTime!,
-                    planned_end: event.end.dateTime!,
-                    task_link: event.htmlLink || null,
-                })
-                .eq('id', existing.id)
-            error = result.error
-        } else {
-            // Insert new block
-            const result = await supabase
-                .from('blocks')
-                .insert({
-                    user_id: user.id,
-                    calendar_id: event.id,
-                    title,
-                    planned_start: event.start.dateTime!,
-                    planned_end: event.end.dateTime!,
-                    type: 'focus',
-                    task_link: event.htmlLink || null,
-                })
-            error = result.error
-        }
-
-        if (error) {
-            errors.push(`${event.id}: ${error.message}`)
-            console.error('[Calendar Sync] Upsert error:', error)
-        } else {
-            syncedCount++
-        }
+    if (upsertError) {
+        console.error('[Calendar Sync] Batch upsert error:', upsertError)
+        return NextResponse.json({ 
+            error: 'Sync failed during database update', 
+            details: upsertError.message 
+        }, { status: 500 })
     }
 
     // Update last sync timestamp
@@ -233,16 +213,13 @@ export async function POST(request: NextRequest) {
         .eq('id', user.id)
 
     console.log('[Calendar Sync] Complete:', {
-        synced: syncedCount,
-        errors: errors.length,
-        errorDetails: errors.slice(0, 3), // Only log first 3 errors
+        synced: timedEvents.length,
     })
 
     return NextResponse.json({
         synced: true,
-        blockCount: syncedCount,
+        blockCount: timedEvents.length,
         totalEvents: timedEvents.length,
         calendarsChecked: calendarIds.length,
-        errors: errors.length > 0 ? errors : undefined,
     })
 }

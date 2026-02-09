@@ -106,10 +106,11 @@ interface Block {
     type: string
     planned_start: string
     planned_end: string
-    stop_condition?: string
-    google_event_id?: string
-    linear_issue_id?: string
-    task_link?: string
+    user_id: string
+    stop_condition?: string | null
+    google_event_id?: string | null
+    linear_issue_id?: string | null
+    task_link?: string | null
 }
 
 export async function POST(request: NextRequest) {
@@ -173,7 +174,7 @@ export async function POST(request: NextRequest) {
 
     const { data: blocks, error: blocksError } = await supabase
         .from('blocks')
-        .select('id, title, type, planned_start, planned_end, stop_condition, google_event_id, linear_issue_id, task_link')
+        .select('id, title, type, planned_start, planned_end, user_id, stop_condition, google_event_id, linear_issue_id, task_link')
         .eq('user_id', user.id)
         .is('calendar_id', null)  // Only manual blocks (not synced from calendar)
         .gte('planned_start', today.toISOString())
@@ -188,40 +189,22 @@ export async function POST(request: NextRequest) {
     let pushedCount = 0
     let updatedCount = 0
     const errors: string[] = []
+    const blocksToUpdate: Block[] = []
 
-    for (const block of blocks as Block[]) {
-        // Build description with links
+    for (const block of (blocks as unknown as Block[])) {
+        // ... (existing description logic)
         const descriptionParts: string[] = []
-
-        // Stop condition if present
-        if (block.stop_condition) {
-            descriptionParts.push(`🎯 Stop condition: ${block.stop_condition}`)
-        }
-
-        // Links section
+        if (block.stop_condition) descriptionParts.push(`🎯 Stop condition: ${block.stop_condition}`)
         const links: string[] = []
-
-        // Link to the app
         const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://pushtostart.gg'
         links.push(`📱 Open in app: ${siteUrl}/blocks`)
-
-        // Linear issue link
-        if (block.linear_issue_id) {
-            links.push(`📐 Linear: https://linear.app/issue/${block.linear_issue_id}`)
-        }
-
-        // Task/External link
-        if (block.task_link) {
-            links.push(`🔗 Link: ${block.task_link}`)
-        }
-
+        if (block.linear_issue_id) links.push(`📐 Linear: https://linear.app/issue/${block.linear_issue_id}`)
+        if (block.task_link) links.push(`🔗 Link: ${block.task_link}`)
         if (links.length > 0) {
-            descriptionParts.push('')  // Empty line separator
+            descriptionParts.push('')
             descriptionParts.push('━━━━━━━━━━━━━━━━━━━━')
             descriptionParts.push(...links)
         }
-
-        // Footer
         descriptionParts.push('')
         descriptionParts.push('Managed by Push To Start')
 
@@ -241,10 +224,7 @@ export async function POST(request: NextRequest) {
 
         try {
             let response: Response
-            let isUpdate = false
-
             if (block.google_event_id) {
-                // Update existing event
                 response = await fetch(
                     `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(block.google_event_id)}`,
                     {
@@ -256,9 +236,7 @@ export async function POST(request: NextRequest) {
                         body: JSON.stringify(eventData),
                     }
                 )
-                isUpdate = true
             } else {
-                // Create new event
                 response = await fetch(
                     `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`,
                     {
@@ -274,13 +252,8 @@ export async function POST(request: NextRequest) {
 
             if (response.ok) {
                 const event = await response.json()
-
-                // Store the Google event ID for future updates
                 if (!block.google_event_id) {
-                    await supabase
-                        .from('blocks')
-                        .update({ google_event_id: event.id })
-                        .eq('id', block.id)
+                    blocksToUpdate.push({ ...block, google_event_id: event.id })
                     pushedCount++
                 } else {
                     updatedCount++
@@ -288,11 +261,21 @@ export async function POST(request: NextRequest) {
             } else {
                 const errorText = await response.text()
                 errors.push(`${block.title}: ${errorText}`)
-                console.error(`[Push] Failed to push block ${block.id}:`, errorText)
             }
         } catch (err) {
             errors.push(`${block.title}: ${err}`)
-            console.error(`[Push] Error pushing block ${block.id}:`, err)
+        }
+    }
+
+    // Bulk update blocks with new Google Event IDs
+    if (blocksToUpdate.length > 0) {
+        const { error: bulkError } = await supabase
+            .from('blocks')
+            .upsert(blocksToUpdate, { onConflict: 'id' })
+        
+        if (bulkError) {
+            console.error('[Push] Bulk update error:', bulkError)
+            errors.push(`Database update failed: ${bulkError.message}`)
         }
     }
 

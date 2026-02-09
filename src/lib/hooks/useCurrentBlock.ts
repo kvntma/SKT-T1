@@ -19,9 +19,9 @@ export function useCurrentBlock() {
                 .gte('planned_end', now)
                 .order('planned_start', { ascending: false })
                 .limit(1)
-                .single()
+                .maybeSingle()
 
-            if (error && error.code !== 'PGRST116') {
+            if (error) {
                 throw error
             }
 

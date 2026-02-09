@@ -424,6 +424,28 @@ Next: ${session.resumeToken}
 | M6: Obsidian | Week 4 | Goal ingestion |
 | M7: AI Planning | Week 5 | Weekly focus generation |
 | M8: Linear | Week 6 | Burndown + auto-comments |
+| M9: Dynamic Schedule | Week 7 | Draggable blocks + AI Refactor |
+
+---
+
+## Phase 6: Dynamic Scheduling (Refactor)
+
+**Goal**: Transform the static schedule into a dynamic orchestration engine.
+
+### 6.1 Draggable Interface
+- [ ] Implement `@dnd-kit` or `FullCalendar` for block manipulation
+- [ ] Add vertical drag-to-reschedule in `CalendarView`
+- [ ] Update `useBlocks` with `updateBlock` mutation for time shifts
+- [ ] Add visual feedback for "Fixed" (External) vs "Fluid" (PTS) blocks
+
+### 6.2 AI Refactor Engine
+- [ ] Create `/api/blocks/refactor` endpoint
+- [ ] Build AI prompt that understands:
+    - Current time and day progress
+    - Pending/skipped blocks
+    - PRD principles (Friction reduction, recovery)
+- [ ] Implement "Proposal Mode": AI suggests changes, user confirms
+- [ ] Integrate "Refactor" button in the Blocks UI
 
 ---
 

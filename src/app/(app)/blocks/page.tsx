@@ -31,6 +31,7 @@ import { CalendarView } from '@/components/calendar-view'
 import { DateTimePicker } from '@/components/ui/date-time-picker'
 import { createClient } from '@/lib/supabase/client'
 import { useBlockColorPreferences, getBlockColorClass } from '@/lib/hooks/useBlockColorPreferences'
+import { Sparkles, Wand2, Check, X } from 'lucide-react'
 
 type ViewMode = 'today' | 'week'
 type DisplayMode = 'list' | 'calendar'
@@ -123,7 +124,12 @@ export default function BlocksPage() {
     const queryClient = useQueryClient()
     const supabase = createClient()
     const [viewMode, setViewMode] = useState<ViewMode>('today')
-    const { blocks, isLoading, createBlock, deleteBlock } = useBlocks(viewMode)
+    const { blocks, isLoading, createBlock, updateBlock, deleteBlock } = useBlocks(viewMode)
+
+    // AI Refactor state
+    const [isRefactoring, setIsRefactoring] = useState(false)
+    const [refactorProposal, setRefactorProposal] = useState<DisplayBlock[] | null>(null)
+
     const {
         isConnected,
         isLoadingCalendars,
@@ -172,6 +178,74 @@ export default function BlocksPage() {
             new Date(a.planned_start).getTime() - new Date(b.planned_start).getTime()
         )
     }, [blocks])
+
+    // Handle block rescheduling via drag-and-drop
+    const handleBlockUpdate = async (id: string, updates: { planned_start: string; planned_end: string }) => {
+        try {
+            await updateBlock.mutateAsync({ id, updates })
+        } catch (error) {
+            console.error('Failed to update block:', error)
+            alert('Failed to reschedule block. Please try again.')
+        }
+    }
+
+    // Handle AI Schedule Refactor
+    const handleAIRefactor = async () => {
+        setIsRefactoring(true)
+        try {
+            // Filter blocks for today only for refactor
+            const today = new Date()
+            today.setHours(0, 0, 0, 0)
+            const tomorrow = new Date(today)
+            tomorrow.setDate(tomorrow.getDate() + 1)
+
+            const blocksToRefactor = allBlocks.filter(b => {
+                const start = new Date(b.planned_start)
+                return start >= today && start < tomorrow
+            })
+
+            const response = await fetch('/api/blocks/refactor', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ blocks: blocksToRefactor })
+            })
+
+            const data = await response.json()
+            if (data.proposal) {
+                setRefactorProposal(data.proposal)
+            } else {
+                alert(data.message || 'AI could not generate a better schedule right now.')
+            }
+        } catch (error) {
+            console.error('AI Refactor failed:', error)
+            alert('Failed to reach the AI engine.')
+        } finally {
+            setIsRefactoring(false)
+        }
+    }
+
+    const commitRefactor = async () => {
+        if (!refactorProposal) return
+        setIsSubmitting(true)
+        try {
+            // Bulk update blocks
+            for (const p of refactorProposal) {
+                await updateBlock.mutateAsync({
+                    id: p.id,
+                    updates: {
+                        planned_start: p.planned_start,
+                        planned_end: p.planned_end
+                    }
+                })
+            }
+            setRefactorProposal(null)
+            alert('✅ Schedule updated!')
+        } catch (error) {
+            console.error('Failed to commit refactor:', error)
+        } finally {
+            setIsSubmitting(false)
+        }
+    }
 
     // Current time state - updates every minute to keep block statuses fresh
     const [currentTime, setCurrentTime] = useState(() => new Date())
@@ -441,17 +515,31 @@ export default function BlocksPage() {
                             Manage your time blocks
                         </p>
                     </div>
-                    <Button
-                        onClick={() => {
-                            if (!showCreate) {
-                                setNewBlock(prev => ({ ...prev, startTime: getDefaultStartTime() }))
-                            }
-                            setShowCreate(!showCreate)
-                        }}
-                        className="bg-white text-black hover:bg-zinc-200"
-                    >
-                        {showCreate ? 'Cancel' : '+ New Block'}
-                    </Button>
+                    <div className="flex gap-2">
+                        <Button
+                            variant="outline"
+                            onClick={handleAIRefactor}
+                            disabled={isRefactoring || allBlocks.length === 0}
+                            className="border-emerald-500/20 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
+                        >
+                            {isRefactoring ? (
+                                <span className="animate-pulse">Analyzing...</span>
+                            ) : (
+                                <><Wand2 className="mr-2 h-4 w-4" /> Refactor</>
+                            )}
+                        </Button>
+                        <Button
+                            onClick={() => {
+                                if (!showCreate) {
+                                    setNewBlock(prev => ({ ...prev, startTime: getDefaultStartTime() }))
+                                }
+                                setShowCreate(!showCreate)
+                            }}
+                            className="bg-white text-black hover:bg-zinc-200"
+                        >
+                            {showCreate ? 'Cancel' : '+ New Block'}
+                        </Button>
+                    </div>
                 </div>
 
                 {/* Google Calendar Connection */}
@@ -882,6 +970,7 @@ export default function BlocksPage() {
                                 // For now, just log - could open a detail modal
                                 console.log('Block clicked:', blockId)
                             }}
+                            onBlockUpdate={handleBlockUpdate}
                         />
                     ) : (
                         allBlocks.map((block) => {

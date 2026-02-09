@@ -1,26 +1,30 @@
 # Current Work Memory
-Last updated: 2026-02-08 17:30 local
+Last updated: 2026-02-08 17:45 local
 
-Ticket: NO_TICKET
+Ticket: SKT-20
 Branch: master
 
 ## Summary
-- Completed SKT-12 and SKT-13.
-- Created follow-up tickets SKT-21 and SKT-22 in Linear.
-- Updated `grab-ticket` workflow to only scan for tickets within the SKT-T1 team (`4071c41c-6ae2-4046-a717-4c54db67db20`).
-- Standardized memory sync: Commit + Push.
+- Implemented Phase 6: Dynamic Scheduling (Initial Refactor).
+- Added `@dnd-kit` for draggable block manipulation in `CalendarView`.
+- Optimized `CalendarPush` and `CalendarSync` API routes with bulk `upsert` operations.
+- Updated `useBlocks` with `updateBlock` mutation.
+- Verified build integrity: ✅ Success.
+- Scoped Linear scanning to SKT-T1 team.
 
 ## Decisions (Do Not Re-litigate)
-- **Linear Scoping:** All ticket detection and proposal tools MUST use the SKT-T1 `teamId`.
-- **Git Sync:** Mandatory immediate Git Commit + Push for `.agent/memory`.
+- **Drag & Drop:** Vertical-only dragging in `CalendarView` with 15-minute snapping.
+- **Bulk Operations:** API routes now use batch `upsert` instead of row-by-row updates for performance.
+- **Type Safety:** Used full block objects for `upsert` to avoid `any` and satisfy DB schema.
 
 ## Current State
-- Workflows restricted to SKT-T1 team.
-- Features stable.
+- Draggable interface functional in `CalendarView`.
+- Build passing.
+- Memory synchronized remotely.
 
 ## Open Questions / Risks
-- None.
+- Dragging currently works for manual blocks; logic for external synced blocks needs careful collision handling in future phases.
 
 ## Next Steps
-- [ ] Commit and Push workflow/memory updates.
-- [ ] Run `grab-ticket` for the next session.
+- [ ] Commit and Push all latest changes.
+- [ ] Begin SKT-11: Show previous resume token on block load.

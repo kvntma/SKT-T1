@@ -8,6 +8,7 @@ interface ExecutionStore extends ExecutionState {
     resumeTimer: () => void
     tick: () => void
     reset: () => void
+    restoreSession: (block: Block, startTime: Date, elapsedSeconds: number) => void
 }
 
 export const useExecutionStore = create<ExecutionStore>((set) => ({
@@ -45,5 +46,13 @@ export const useExecutionStore = create<ExecutionStore>((set) => ({
             isRunning: false,
             startTime: undefined,
             elapsedSeconds: 0,
+        }),
+
+    restoreSession: (block, startTime, elapsedSeconds) =>
+        set({
+            isRunning: true,
+            currentBlock: block,
+            startTime,
+            elapsedSeconds,
         }),
 }))
