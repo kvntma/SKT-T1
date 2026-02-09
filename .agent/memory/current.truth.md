@@ -1,34 +1,23 @@
 # Current Truth Memory
-Last updated: 2026-01-27 22:28 local
+Last updated: 2026-02-08 15:55 local
 
 ## Key Decisions
-- **Block Source Indication:** Use left-border color to distinguish Manual vs Calendar blocks.
-- **Status Override:** Status colors (Amber for 'Missed') always override source colors.
-- **Navigation:** Use `sessionStorage` for passing `startBlockId` between Blocks and Now page.
-- **Color Defaults:** Manual = Emerald, Calendar = Zinc.
+- **Workflow:** Ralph Workflow with mandatory Git commits for `.agent/memory` updates.
+- **Persistence:** All agent state and plans must be committed to Git history.
+- **SKT-13:** Edit session details for completed blocks.
 
 ## Architecture & Constraints
-- **Tailwind Dynamic Colors:** Must handle JIT trimming. Use specific safelisted classes or map full class names, do not use interpolated strings like `bg-${color}-500` without safelisting.
-- **Block Fields:** `DisplayBlock` type manually maps DB fields (`google_event_id`, `linear_issue_id`) for UI consumption.
-- **Hook Pattern:** `useBlockColorPreferences` wraps profile read/write for color settings.
+- **Tailwind Dynamic Colors:** Static lookup map only.
+- **Session Outcomes:** ['done', 'aborted', 'skipped', 'abandoned'].
 
-## Active Ticket: SKT-18 (Settings Colors)
-- **Goal:** User-customizable block source colors.
-- **Progress:** DB migration applied, types updated, hook created. UI scaffolding in place.
-- **Remaining:** Connect UI components, refactor block lists to use hook, handle Tailwind JIT.
-
-## Known Gotchas
-- **Calendar Sync:** Pushed blocks store `google_event_id`. Pulled blocks stored as normal blocks with `calendar_id`.
-- **Date Handling:** `DateTimePicker` uses date-fns but DB expects ISO strings.
+## Active Ticket: SKT-13
+- Goal: Enable editing of session details in block detail page.
 
 ## TODO
-- [ ] Implement Color Picker UI in Settings
-- [ ] Connect `BlocksPage` and `CalendarView` to `useBlockColorPreferences`
-- [ ] Verify dynamic class generation works with Tailwind
-- [ ] Commit unstaged changes
+- [ ] Implement session editing in `[id]/page.tsx`
+- [ ] Enable edit button for all completed blocks in `blocks/page.tsx`
 
 ## Key Files
+- `.agent/workflows/*.md`
+- `src/app/(app)/blocks/[id]/page.tsx`
 - `src/app/(app)/blocks/page.tsx`
-- `src/components/calendar-view.tsx`
-- `src/app/(app)/settings/page.tsx`
-- `src/lib/hooks/useBlockColorPreferences.ts`

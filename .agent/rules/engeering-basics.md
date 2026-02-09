@@ -14,3 +14,9 @@ trigger: always_on
 - Security: never print secrets; use env vars; be careful with auth redirects/cookies.
 - When running git commands in the agent terminal, always disable pagers using `--no-pager`.
 - Avoid interactive commands (`less`, `man`, editors) unless explicitly requested.
+
+## Sub-agent Safety & Guardrails
+- **YOLO Mode Caution**: When using sub-agents, remember they operate in "YOLO mode" (no individual tool confirmation).
+- **Policy Enforcement**: A global policy in `~/.gemini/policies/subagent-guardrails.toml` enforces `ask_user` for destructive shell commands, `write_file`, `replace`, and `save_memory` even in YOLO mode.
+- **Explicit Constraints**: Always provide sub-agents with narrow, well-defined tasks and explicit constraints to prevent them from wandering or making unintended changes.
+- **Verification**: Always review the work produced by sub-agents, especially when they have modified the codebase.

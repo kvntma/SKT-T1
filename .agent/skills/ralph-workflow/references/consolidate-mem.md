@@ -13,6 +13,3 @@ description: Compress session summaries into a tight “current truth” memory 
 - Links/files that matter
 
 3) Keep it under ~150 lines. Prefer bullets.
-
-4) Commit memory changes
-- Run `git add .agent/memory/current.truth.md && git commit -m "chore(agent): consolidate current truth memory"`

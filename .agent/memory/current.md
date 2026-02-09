@@ -1,48 +1,28 @@
 # Current Work Memory
-Last updated: 2026-01-28 01:51 EST
+Last updated: 2026-02-08 15:55 local
 
-Ticket: SKT-19
+Ticket: SKT-13
 Branch: master
 
 ## Summary
-- Implemented undo-able Stop button with 5-second countdown modal
-- Added hybrid data safety approach: session marked as `abandoned` immediately on Stop click
-- Fixed cache invalidation bug: `endSession` wasn't invalidating `['blocks']` query
-- Added `resumeTimer()` to execution store to preserve elapsed time during undo
-- Added red "Confirm Stop" button for immediate navigation
-- Updated Supabase DB constraint to include `abandoned` outcome
-- Standardized cache invalidation across all mutations (blocks, sessions, currentBlock)
+- Updated `ralph-workflow` skill and all agent workflows to mandate immediate Git commits for memory file changes.
+- Preparing to implement SKT-13: Edit completed blocks and session details.
+- Verified `[id]/page.tsx` needs session editing fields.
 
 ## Decisions (Do Not Re-litigate)
-- **Undo Toast over Confirmation Dialog**: Less friction for intentional stops, safety for accidents
-- **Hybrid Abandon Pattern**: Write `outcome: 'abandoned'` immediately on Stop → data safe even if user closes tab
-- **Centered Modal**: Undo overlay centered on screen to avoid being hidden by bottom nav
-- **`resumeTimer()` vs `startTimer()`**: `resumeTimer` doesn't reset `elapsedSeconds`, allowing undo to continue from paused time
+- **Git Sync:** All `.agent/memory` updates must be committed immediately.
+- **SKT-13 UI:** Use session editing UI (outcome, reason, resume token) similar to `/save` page.
 
 ## Current State
-- `/now` page has full undo-able stop flow with 5-second countdown
-- `useSession` hook exports: `startSession`, `abandonSession`, `resumeSession`, `endSession`
-- `execution-store` exports: `startTimer`, `stopTimer`, `resumeTimer`, `tick`, `reset`, `setCurrentBlock`
-- Block status logic recognizes `abandoned` → shows as "Stopped (Unsaved)"
-- All mutations (create/delete block, start/abandon/resume/end session) invalidate `['blocks']`, `['currentBlock']`, `['sessions']`
+- Workflow updated to commit memory.
+- `[id]/page.tsx` lacks session editing.
 
 ## Open Questions / Risks
-- None for SKT-19; feature complete pending testing
+- None.
 
 ## Next Steps
-- [ ] Test full undo-stop flow: Start session → Stop → Undo → verify timer resumes
-- [ ] Test confirm flow: Start session → Stop → Confirm Stop → verify save page loads
-- [ ] Test abandon recovery: Start session → Stop → close browser → verify block shows "Stopped (Unsaved)"
-- [ ] Commit changes: `git add -A && git commit -m "feat(now): add undo-able stop with hybrid data safety (SKT-19)"`
-- [ ] Mark SKT-19 as Done in Linear
-
-## References
-- Ticket: https://linear.app/skt-t1/issue/SKT-19
-- PR: N/A (direct commit to master)
-- Files:
-  - src/app/(app)/now/page.tsx (undo modal, handlers)
-  - src/lib/hooks/useSession.ts (abandonSession, resumeSession mutations)
-  - src/lib/hooks/useBlocks.ts (cache invalidation)
-  - src/lib/stores/execution-store.ts (resumeTimer)
-  - src/lib/blocks/config.ts (abandoned status handling)
-  - src/types/index.ts (Session outcome type)
+- [ ] Commit these memory updates.
+- [ ] Add session state fields to `src/app/(app)/blocks/[id]/page.tsx`
+- [ ] Implement UI for session outcome, reason, and resume token in `[id]/page.tsx`
+- [ ] Update `handleSave` in `[id]/page.tsx` to update `sessions` table
+- [ ] Enable "Edit" button for calendar blocks in `src/app/(app)/blocks/page.tsx`
