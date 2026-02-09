@@ -38,19 +38,13 @@ function getBlockTypeColor(type: string): string {
 export default function NowPage() {
     const { data: currentBlock, isLoading: currentBlockLoading } = useCurrentBlock()
     const { blocks, isLoading: blocksLoading } = useBlocks()
-    const { isRunning, elapsedSeconds, startTimer, stopTimer, resumeTimer, tick, setCurrentBlock } = useExecutionStore()
+    const { isRunning, elapsedSeconds, startTimer, stopTimer, resumeTimer, tick, setCurrentBlock, restoreSession } = useExecutionStore()
     const { startSession, abandonSession, resumeSession, endSession } = useSession()
     const [mounted, setMounted] = useState(false)
     const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
     const blockStartTimeRef = useRef<Date | null>(null)
     const [overrideBlock, setOverrideBlock] = useState<Block | null>(null)
-    const [autoStartTriggered, setAutoStartTriggered] = useState(false)
-
-    // Undo stop functionality
-    const [pendingStop, setPendingStop] = useState(false)
-    const [undoCountdown, setUndoCountdown] = useState(5)
-    const undoTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-    const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null)
+    const [isRestoring, setIsRestoring] = useState(true)
 
     // The block to display - prefer override (from blocks page), fallback to current
     const activeBlock = overrideBlock || currentBlock
@@ -59,9 +53,59 @@ export default function NowPage() {
         setMounted(true)
     }, [])
 
-    // Check for startBlockId in sessionStorage on mount - fetch directly by ID
+    // Check for active session in DB on mount (handles page refresh)
     useEffect(() => {
         if (!mounted) return
+
+        const detectActiveSession = async () => {
+            try {
+                const supabase = (await import('@/lib/supabase/client')).createClient()
+                const { data: { user } } = await supabase.auth.getUser()
+                if (!user) return
+
+                // Look for most recent session with no outcome
+                const { data: sessionData, error: sessionError } = await supabase
+                    .from('sessions')
+                    .select(`
+                        *,
+                        blocks (*)
+                    `)
+                    .eq('user_id', user.id)
+                    .is('outcome', null)
+                    .order('actual_start', { ascending: false })
+                    .limit(1)
+                    .single()
+
+                if (sessionData && !sessionError) {
+                    const block = sessionData.blocks as unknown as Block
+                    const startTime = new Date(sessionData.actual_start)
+                    const now = new Date()
+                    const elapsed = Math.max(0, Math.floor((now.getTime() - startTime.getTime()) / 1000))
+
+                    setCurrentSessionId(sessionData.id)
+                    restoreSession(block, startTime, elapsed)
+                    setOverrideBlock(block)
+                    console.log('Restored active session:', sessionData.id)
+                }
+            } catch (err) {
+                console.error('Error detecting active session:', err)
+            } finally {
+                setIsRestoring(false)
+            }
+        }
+
+        detectActiveSession()
+    }, [mounted, restoreSession])
+
+    // Check for startBlockId in sessionStorage on mount - fetch directly by ID
+    useEffect(() => {
+        if (!mounted || !isRestoring) return // Wait for restoration check to finish
+
+        // Only use sessionStorage if we didn't just restore a session
+        if (currentSessionId) {
+            sessionStorage.removeItem('startBlockId')
+            return
+        }
 
         const startBlockId = sessionStorage.getItem('startBlockId')
         if (startBlockId) {
