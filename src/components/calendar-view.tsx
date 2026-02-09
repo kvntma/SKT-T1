@@ -15,6 +15,7 @@ import {
 } from '@dnd-kit/core'
 import { useDraggable } from '@dnd-kit/core'
 import { restrictToVerticalAxis, restrictToFirstScrollableAncestor } from '@dnd-kit/modifiers'
+import { GripVertical } from 'lucide-react'
 
 interface DisplayBlock {
     id: string
@@ -92,12 +93,7 @@ interface DraggableBlockProps {
 function DraggableBlock({ block, style, manualColor, blockCalendarColor, onBlockClick }: DraggableBlockProps) {
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
         id: block.id,
-        disabled: block.source === 'calendar', // For now, only manual blocks are draggable? 
-        // User said: "it should only be able to move items inside PTS (pushtostart)"
-        // Synced calendar items (from PTS calendar) have source='calendar' currently? 
-        // Wait, source='calendar' means it was IMPORTED from an external calendar.
-        // source='manual' means it was created in the app.
-        // Actually, let's allow dragging both if they belong to PTS.
+        disabled: block.source === 'calendar',
     })
 
     const config = BLOCK_CONFIGS[block.type]
@@ -107,13 +103,10 @@ function DraggableBlock({ block, style, manualColor, blockCalendarColor, onBlock
     } : undefined
 
     return (
-        <button
+        <div
             ref={setNodeRef}
-            {...listeners}
-            {...attributes}
-            onClick={() => onBlockClick?.(block.id)}
             className={cn(
-                "absolute rounded-lg px-2 py-1 text-left transition-all hover:ring-2 hover:ring-white/20 z-10",
+                "absolute rounded-lg p-1 text-left transition-all hover:ring-2 hover:ring-white/20 z-10",
                 isDragging ? "opacity-50 z-50 ring-2 ring-emerald-500 shadow-xl" : "",
                 block.source === 'manual' && getBlockColor(block.type),
                 "overflow-hidden border-l-2",
@@ -128,18 +121,37 @@ function DraggableBlock({ block, style, manualColor, blockCalendarColor, onBlock
                 } : {})
             }}
         >
-            <div className="flex items-center gap-1.5 text-white">
-                {config?.icon && <config.icon className="h-3 w-3 shrink-0" />}
-                <span className="truncate text-xs font-medium">{block.title}</span>
+            <div className="flex items-start h-full gap-0.5">
+                {/* Drag Handle */}
+                {block.source === 'manual' && (
+                    <div
+                        {...listeners}
+                        {...attributes}
+                        className="cursor-grab active:cursor-grabbing p-0.5 hover:bg-white/10 rounded shrink-0 self-stretch flex items-center"
+                        title="Drag to reschedule"
+                    >
+                        <GripVertical className="h-3.5 w-3.5 text-white/40" />
+                    </div>
+                )}
+
+                <button
+                    onClick={() => onBlockClick?.(block.id)}
+                    className="flex-1 min-w-0 text-left h-full"
+                >
+                    <div className="flex items-center gap-1.5 text-white">
+                        {config?.icon && <config.icon className="h-3 w-3 shrink-0" />}
+                        <span className="truncate text-xs font-medium">{block.title}</span>
+                    </div>
+                    <p className="truncate text-[10px] text-white/60">
+                        {new Date(block.planned_start).toLocaleTimeString('en-US', {
+                            hour: 'numeric',
+                            minute: '2-digit',
+                            hour12: true,
+                        })}
+                    </p>
+                </button>
             </div>
-            <p className="truncate text-[10px] text-white/60">
-                {new Date(block.planned_start).toLocaleTimeString('en-US', {
-                    hour: 'numeric',
-                    minute: '2-digit',
-                    hour12: true,
-                })}
-            </p>
-        </button>
+        </div>
     )
 }
 

@@ -8,6 +8,7 @@ Branch: master
 - Completed SKT-25: General Block Editing.
 - Enabled "Edit" button for all manual blocks in the List view (previously only for completed blocks).
 - Added click-to-edit navigation in the Calendar view.
+- Added a `GripVertical` icon as a dedicated drag handle in `CalendarView` to prevent accidental drags during clicks.
 - Verified that `[id]/page.tsx` handles both upcoming and completed blocks correctly.
 
 ## Decisions (Do Not Re-litigate)
