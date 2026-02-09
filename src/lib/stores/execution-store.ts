@@ -3,26 +3,28 @@ import type { Block, ExecutionState } from '@/types'
 
 interface ExecutionStore extends ExecutionState {
     setCurrentBlock: (block: Block | undefined) => void
-    startTimer: () => void
+    startTimer: (sessionId?: string) => void
     stopTimer: () => void
     resumeTimer: () => void
     tick: () => void
     reset: () => void
-    restoreSession: (block: Block, startTime: Date, elapsedSeconds: number) => void
+    restoreSession: (block: Block, startTime: Date, elapsedSeconds: number, sessionId: string) => void
 }
 
 export const useExecutionStore = create<ExecutionStore>((set) => ({
     isRunning: false,
     startTime: undefined,
     currentBlock: undefined,
+    currentSessionId: undefined,
     elapsedSeconds: 0,
 
     setCurrentBlock: (block) => set({ currentBlock: block }),
 
-    startTimer: () =>
+    startTimer: (sessionId) =>
         set({
             isRunning: true,
             startTime: new Date(),
+            currentSessionId: sessionId,
             elapsedSeconds: 0,
         }),
 
@@ -46,13 +48,15 @@ export const useExecutionStore = create<ExecutionStore>((set) => ({
             isRunning: false,
             startTime: undefined,
             currentBlock: undefined,
+            currentSessionId: undefined,
             elapsedSeconds: 0,
         }),
 
-    restoreSession: (block, startTime, elapsedSeconds) =>
+    restoreSession: (block, startTime, elapsedSeconds, sessionId) =>
         set({
             isRunning: true,
             currentBlock: block,
+            currentSessionId: sessionId,
             startTime,
             elapsedSeconds,
         }),

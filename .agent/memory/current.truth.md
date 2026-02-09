@@ -1,34 +1,29 @@
 # Current Truth Memory
-Last updated: 2026-02-08 18:30 local
+Last updated: 2026-02-08 19:15 local
 
 ## Stable Decisions
-- **Workflow:** Adopted "Ralph Workflow" with mandatory Git Commit + Push for all `.agent/memory` updates to ensure cross-session remote sync.
+- **Workflow:** Adopted "Ralph Workflow" with mandatory Git Commit + Push for all `.agent/memory` updates.
 - **Source of Truth:** Supabase `sessions` table is the source of truth for active timers (`outcome IS NULL`).
-- **Session Recovery:** On refresh, `/now` page restores state (Block + elapsed timer) from DB.
-- **Session Continuity:** "Last Action" (resume token from previous session) is displayed on new block load to maintain momentum.
+- **Session Recovery:** `/now` page restores state (Block + elapsed timer + SessionID) from DB if started in the last 24 hours.
+- **Session Continuity:** "Last Action" (resume token) is displayed on new block load to maintain momentum.
 - **Unified Editing:** Manual and calendar blocks are fully editable (including session metadata) once a session record exists.
-- **Manual Blocks:** Default color = Emerald. Calendar blocks use native Google hex colors.
 - **Drag & Drop:** `CalendarView` supports vertical-only dragging with 15-minute snapping via `@dnd-kit`.
 
 ## Architecture & Constraints
+- **Execution Store:** Global Zustand store (`isRunning`, `elapsedSeconds`, `currentBlock`, `currentSessionId`) manages all timer logic.
+- **Session ID Persistence:** `currentSessionId` MUST be in the store to survive navigation; otherwise "Done/Stop" might fail to find the ID to close the session in the DB.
+- **Stale Session Safety:** Queries for active sessions (`outcome IS NULL`) MUST include a 24-hour lookback limit to avoid "zombie" timers from the past.
 - **Tailwind JIT:** No string interpolation for dynamic classes; use static lookup maps only.
-- **Execution Store:** Global Zustand store (`isRunning`, `elapsedSeconds`, `currentBlock`) must be cleared via `reset()` before navigating away from execution context.
-- **Sync Logic:** Filter "Push To Start" calendar during imports to prevent circular sync loops.
-- **API Performance:** Use batch `upsert` for calendar push/sync to minimize DB round-trips.
 
 ## Active TODOs
 - [ ] Implement AI Refactor Engine (`/api/blocks/refactor`) for dynamic rescheduling.
-- [ ] Add collision detection for draggable blocks against external "anchor" events.
 - [ ] Implement retrospective session creation for "Missed" blocks (SKT-21).
 - [ ] Implement auto-transition of Linear issue status on session completion (SKT-22).
 
 ## Key Files
-- `src/lib/stores/execution-store.ts` (Global timer state)
-- `src/app/(app)/now/page.tsx` (Execution core)
-- `src/components/calendar-view.tsx` (Draggable orchestration)
-- `src/lib/hooks/useSession.ts` (Active/Last session logic)
-- `src/app/api/calendar/` (Optimized sync routes)
+- `src/lib/stores/execution-store.ts` (Global timer + session ID state)
+- `src/app/(app)/now/page.tsx` (Execution core with 24h lookup)
+- `src/lib/hooks/useSession.ts` (Mutation logic for DB)
 
 ## Known Gotchas
-- **Browser Cache:** "Not defined" errors after code updates often require a hard browser refresh to clear stale dev-server artifacts.
-- **UPSERT Mapping:** Supabase `upsert` requires full objects (including `user_id`) to satisfy TypeScript/DB constraints.
+- **State Inconsistency:** If `isRunning` is true but no DB session is found, the UI now auto-resets the store to prevent deadlocks.

@@ -59,5 +59,6 @@ export interface ExecutionState {
     isRunning: boolean
     startTime?: Date
     currentBlock?: Block
+    currentSessionId?: string
     elapsedSeconds: number
 }

@@ -39,10 +39,9 @@ function getBlockTypeColor(type: string): string {
 export default function NowPage() {
     const { data: currentBlock, isLoading: currentBlockLoading } = useCurrentBlock()
     const { blocks, isLoading: blocksLoading } = useBlocks()
-    const { isRunning, elapsedSeconds, startTimer, stopTimer, resumeTimer, tick, setCurrentBlock, restoreSession, reset } = useExecutionStore()
+    const { isRunning, elapsedSeconds, currentSessionId, startTimer, stopTimer, resumeTimer, tick, setCurrentBlock, restoreSession, reset } = useExecutionStore()
     const { startSession, abandonSession, resumeSession, endSession, lastSession } = useSession()
     const [mounted, setMounted] = useState(false)
-    const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
     const blockStartTimeRef = useRef<Date | null>(null)
     const [overrideBlock, setOverrideBlock] = useState<Block | null>(null)
     const [isRestoring, setIsRestoring] = useState(true)
@@ -70,6 +69,10 @@ export default function NowPage() {
                 const { data: { user } } = await supabase.auth.getUser()
                 if (!user) return
 
+                // Safety: Only restore sessions started in the last 24 hours
+                const yesterday = new Date()
+                yesterday.setHours(yesterday.getHours() - 24)
+
                 // Look for most recent session with no outcome
                 const { data: sessionData, error: sessionError } = await supabase
                     .from('sessions')
@@ -79,6 +82,7 @@ export default function NowPage() {
                     `)
                     .eq('user_id', user.id)
                     .is('outcome', null)
+                    .gt('actual_start', yesterday.toISOString())
                     .order('actual_start', { ascending: false })
                     .limit(1)
                     .maybeSingle()
@@ -89,10 +93,15 @@ export default function NowPage() {
                     const now = new Date()
                     const elapsed = Math.max(0, Math.floor((now.getTime() - startTime.getTime()) / 1000))
 
-                    setCurrentSessionId(sessionData.id)
-                    restoreSession(block, startTime, elapsed)
+                    restoreSession(block, startTime, elapsed, sessionData.id)
                     setOverrideBlock(block)
                     console.log('Restored active session:', sessionData.id)
+                } else if (isRunning) {
+                    // If no active session found in DB but store says we are running,
+                    // we are in an inconsistent state (e.g. session was closed elsewhere).
+                    // Reset to be safe.
+                    console.log('No active session in DB, resetting store')
+                    reset()
                 }
             } catch (err) {
                 console.error('Error detecting active session:', err)
@@ -102,7 +111,7 @@ export default function NowPage() {
         }
 
         detectActiveSession()
-    }, [mounted, restoreSession])
+    }, [mounted, restoreSession, isRunning, reset])
 
     // Check for startBlockId in sessionStorage on mount - fetch directly by ID
     useEffect(() => {
@@ -132,7 +141,7 @@ export default function NowPage() {
             }
             fetchBlock()
         }
-    }, [mounted])
+    }, [mounted, isRestoring, currentSessionId])
 
     useEffect(() => {
         if (activeBlock) {
@@ -216,8 +225,7 @@ export default function NowPage() {
                 blockId: activeBlock.id,
                 timeToStart,
             })
-            setCurrentSessionId(session.id)
-            startTimer()
+            startTimer(session.id)
         } catch (error) {
             console.error('Failed to start session:', error)
         }

@@ -1,30 +1,25 @@
 # Current Work Memory
-Last updated: 2026-02-08 18:15 local
+Last updated: 2026-02-08 19:10 local
 
-Ticket: SKT-11
+Ticket: SKT-23 (Bugfix)
 Branch: master
 
 ## Summary
-- Completed SKT-11: Show previous resume token on block load.
-- Fixed [Bug] /now page timer shows 17000+ minutes (SKT-23).
-- Resolved build errors and "not defined" variable issues:
-    - Added `reset` and `lastSession` to destructuring in `now/page.tsx`.
-    - Restored `activeId` state and `useState` import in `calendar-view.tsx`.
-    - Verified build integrity: ✅ Success.
+- Fixed "Stuck on old task/17000 min timer" bug:
+    - Cleared 5 zombie sessions from Jan 25-28 in DB.
+    - Added 24-hour safety limit to `detectActiveSession` query.
+    - Moved `currentSessionId` to global `execution-store` to prevent state loss during navigation.
+    - Added auto-reset if DB session and local store state are inconsistent.
 
 ## Decisions (Do Not Re-litigate)
-- **Git Sync:** Mandatory immediate Git Commit + Push for `.agent/memory`.
-- **UI Logic:** Resume token only shows if current block has no stop condition and session hasn't started.
+- **Session Expiry:** Sessions started >24 hours ago are considered "abandoned" by the UI and will not be restored.
+- **Store Ownership:** `currentSessionId` is now a first-class citizen of `useExecutionStore`.
 
 ## Current State
-- Build passing.
-- SKT-11 and SKT-23 verified.
-- Memory synchronized.
-
-## Open Questions / Risks
-- Browser cache might need a hard refresh if "not defined" errors persist despite code fixes.
+- Build passing. ✅
+- DB cleaned up. ✅
+- Robust session restoration implemented. ✅
 
 ## Next Steps
-- [x] Fix "lastSession is not defined" error.
-- [x] Fix "setActiveId is not defined" error.
-- [ ] Monitor for any runtime issues with resume token data.
+- [ ] Monitor for any "stuck" reports from users.
+- [ ] Proceed with SKT-21 (Retrospective session creation).
