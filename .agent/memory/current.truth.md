@@ -1,23 +1,26 @@
 # Current Truth Memory
-Last updated: 2026-02-08 16:45 local
+Last updated: 2026-02-08 18:30 local
 
 ## Key Decisions
-- **Workflow:** Ralph Workflow with mandatory Git Commit + Push for `.agent/memory` updates.
-- **Persistence:** Agent state is synchronized remotely to support multi-agent/multi-machine context.
-- **SKT-13:** Block details and sessions are now fully editable.
+- **Vision:** "Push To Start" is a dynamic execution layer, not a static tracker.
+- **Workflow:** Standardized on "Ralph Workflow" (.agent/memory/ persistence is mandatory).
+- **Stability:** Use bulk DB operations (`upsert`) and `.maybeSingle()` to maintain clean logs and avoid race conditions.
+- **Draggable Context:** 1px = 1 minute vertical scale with 15-minute snapping.
 
-## Architecture & Constraints
-- **Tailwind Dynamic Colors:** Static lookup map only.
-- **Session Restoration:** Restored via DB check on page mount (`outcome IS NULL`).
+## Architecture
+- **Dynamic Scheduling:** Managed via `@dnd-kit` (Frontend) and `/api/blocks/refactor` (AI Backend).
+- **Anchors:** External calendar events are treated as immutable anchors by the AI.
+- **Memory:** Ticket-specific state lives in `.agent/memory/tickets/`.
 
-## Active Ticket: SKT-12
-- Goal: Maintain execution state across page refreshes.
-
-## TODO
-- [ ] Implement session detection in `now/page.tsx`.
-- [ ] Verify full restoration flow (Block + Timer).
+## Progress (Phase 6)
+- [x] Draggable vertical time-grid
+- [x] AI Schedule Refactor (Proposal flow)
+- [x] Bulk Sync/Push optimizations
+- [x] Linear Ticket alignment
 
 ## Key Files
-- `src/lib/stores/execution-store.ts`
-- `src/app/(app)/now/page.tsx`
-- `src/app/(app)/blocks/[id]/page.tsx`
+- `src/components/calendar-view.tsx` (Draggable Grid)
+- `src/app/api/blocks/refactor/route.ts` (Refactor Engine)
+- `src/app/api/calendar/sync/route.ts` (Batch Sync)
+- `pushtostart.md` (Source of Truth PRD)
+- `IMPLEMENTATION_PLAN.md` (Roadmap)

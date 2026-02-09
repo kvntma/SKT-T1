@@ -1,6 +1,6 @@
 'use client'
 
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import type { Session } from '@/types'
 
@@ -23,6 +23,27 @@ interface AbandonSessionParams {
 export function useSession() {
     const supabase = createClient()
     const queryClient = useQueryClient()
+
+    const lastSessionQuery = useQuery({
+        queryKey: ['sessions', 'last'],
+        queryFn: async () => {
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) return null
+
+            const { data, error } = await supabase
+                .from('sessions')
+                .select('*')
+                .eq('user_id', user.id)
+                .not('resume_token', 'is', null)
+                .neq('resume_token', '')
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle()
+
+            if (error) throw error
+            return data as Session | null
+        },
+    })
 
     const startSession = useMutation({
         mutationFn: async ({ blockId, timeToStart }: StartSessionParams) => {
@@ -122,5 +143,8 @@ export function useSession() {
         abandonSession,
         resumeSession,
         endSession,
+        lastSession: lastSessionQuery.data,
+        isLoadingLastSession: lastSessionQuery.isLoading,
+        refreshLastSession: () => queryClient.invalidateQueries({ queryKey: ['sessions', 'last'] }),
     }
 }

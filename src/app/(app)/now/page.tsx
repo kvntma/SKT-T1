@@ -493,16 +493,29 @@ export default function NowPage() {
                     )}
                 </div>
 
-                {/* Stop Condition */}
-                {activeBlock.stop_condition && (
+                {/* Info Card (Stop Condition or Last Action) */}
+                {(activeBlock.stop_condition || (lastSession?.resume_token && !isRunning)) && (
                     <Card className="mt-6 w-full border-zinc-800 bg-zinc-900/50">
                         <CardContent className="p-4">
-                            <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">
-                                Stop Condition
-                            </p>
-                            <p className="mt-1 text-sm text-zinc-300">
-                                {activeBlock.stop_condition}
-                            </p>
+                            {activeBlock.stop_condition ? (
+                                <>
+                                    <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">
+                                        Stop Condition
+                                    </p>
+                                    <p className="mt-1 text-sm text-zinc-300">
+                                        {activeBlock.stop_condition}
+                                    </p>
+                                </>
+                            ) : lastSession?.resume_token && !isRunning ? (
+                                <>
+                                    <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">
+                                        Last Action
+                                    </p>
+                                    <p className="mt-1 text-sm text-zinc-300">
+                                        {lastSession.resume_token}
+                                    </p>
+                                </>
+                            ) : null}
                         </CardContent>
                     </Card>
                 )}
@@ -510,11 +523,11 @@ export default function NowPage() {
                 {/* Navigation */}
                 <div className="mt-8 flex items-center gap-4">
                     <Button variant="ghost" size="sm" className="text-zinc-500 hover:text-white" asChild>
-                        <a href="/blocks">Blocks</a>
+                        <Link href="/blocks">Blocks</Link>
                     </Button>
                     <span className="text-zinc-700">•</span>
                     <Button variant="ghost" size="sm" className="text-zinc-500 hover:text-white" asChild>
-                        <a href="/stats">Stats</a>
+                        <Link href="/stats">Stats</Link>
                     </Button>
                 </div>
 
