@@ -138,14 +138,14 @@ function DraggableBlock({ block, style, manualColor, blockCalendarColor, onBlock
                     </p>
                 </div>
 
-                {/* Edit Button - Centered vertically in its container */}
+                {/* Edit Button - Centered vertically in its container with increased visibility */}
                 <button
                     onPointerDown={(e) => e.stopPropagation()}
                     onClick={(e) => {
                         e.stopPropagation()
                         onBlockClick?.(block.id)
                     }}
-                    className="p-1.5 hover:bg-white/20 rounded-md text-white/60 hover:text-white transition-colors shrink-0"
+                    className="p-1.5 bg-black/20 hover:bg-black/40 border border-white/20 hover:border-white/40 rounded-md text-white/80 hover:text-white transition-all shrink-0 shadow-sm"
                     title="Edit block"
                 >
                     <Pencil className="h-3.5 w-3.5" />
@@ -425,7 +425,7 @@ export function CalendarView({ blocks, viewMode, onBlockClick, onBlockUpdate, co
                                                 e.stopPropagation()
                                                 onBlockClick?.(block.id)
                                             }}
-                                            className="p-0.5 hover:bg-white/20 rounded text-white/60 hover:text-white transition-colors shrink-0"
+                                            className="p-0.5 bg-black/20 hover:bg-black/40 border border-white/10 hover:border-white/30 rounded text-white/80 hover:text-white transition-all shrink-0 shadow-sm"
                                             title="Edit block"
                                         >
                                             <Pencil className="h-2.5 w-2.5" />
