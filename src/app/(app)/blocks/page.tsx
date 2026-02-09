@@ -31,7 +31,7 @@ import { CalendarView } from '@/components/calendar-view'
 import { DateTimePicker } from '@/components/ui/date-time-picker'
 import { createClient } from '@/lib/supabase/client'
 import { useBlockColorPreferences, getBlockColorClass } from '@/lib/hooks/useBlockColorPreferences'
-import { Sparkles, Wand2, Check, X } from 'lucide-react'
+import { Sparkles, Wand2, Check, X, Repeat } from 'lucide-react'
 
 type ViewMode = 'today' | 'week'
 type DisplayMode = 'list' | 'calendar'
@@ -42,11 +42,6 @@ function getBlockTypeColor(type: string): string {
         return `${config.color.bg} ${config.color.text} ${config.color.border}`
     }
     return 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20'
-}
-
-function getBlockTypeEmoji(type: string): string {
-    const config = BLOCK_CONFIGS[type as BlockType]
-    return config?.emoji ?? '⚡'
 }
 
 function formatTime(date: string): string {
@@ -110,6 +105,8 @@ interface DisplayBlock {
     calendar_link?: string
     google_event_id?: string | null
     linear_issue_id?: string | null
+    task_id?: string | null
+    routine_id?: string | null
     task_link?: string | null
     session?: {
         id?: string
@@ -170,6 +167,8 @@ export default function BlocksPage() {
                 calendar_link: isCalendarBlock ? block.task_link ?? undefined : undefined,
                 google_event_id: block.google_event_id,
                 linear_issue_id: block.linear_issue_id,
+                task_id: block.task_id,
+                routine_id: block.routine_id,
                 task_link: !isCalendarBlock ? block.task_link : undefined, // Only for manual blocks
                 // Use session data from the joined query
                 session: (block as { session?: { id?: string; outcome?: string; actual_start?: string; actual_end?: string } }).session ?? null,
@@ -541,6 +540,38 @@ export default function BlocksPage() {
                         </Button>
                     </div>
                 </div>
+
+                {/* Proposal Overlay */}
+                {refactorProposal && (
+                    <Card className="mb-6 border-emerald-500/50 bg-emerald-500/5 backdrop-blur-xl ring-1 ring-emerald-500/30">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-emerald-400 text-lg">
+                                <Sparkles className="h-5 w-5" /> AI Proposed a New Schedule
+                            </CardTitle>
+                            <CardDescription className="text-emerald-400/70">
+                                The AI has optimized your remaining blocks to reduce friction.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="flex justify-end gap-3 pt-2">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setRefactorProposal(null)}
+                                className="text-zinc-400 hover:text-white"
+                            >
+                                <X className="mr-2 h-4 w-4" /> Discard
+                            </Button>
+                            <Button
+                                size="sm"
+                                onClick={commitRefactor}
+                                disabled={isSubmitting}
+                                className="bg-emerald-600 text-white hover:bg-emerald-500"
+                            >
+                                <Check className="mr-2 h-4 w-4" /> Apply Changes
+                            </Button>
+                        </CardContent>
+                    </Card>
+                )}
 
                 {/* Google Calendar Connection */}
                 <Card className="mb-6 border-zinc-800 bg-zinc-900/80 backdrop-blur-xl">
@@ -967,8 +998,7 @@ export default function BlocksPage() {
                             colorPrefs={colorPrefs}
                             calendars={allCalendars}
                             onBlockClick={(blockId) => {
-                                // For now, just log - could open a detail modal
-                                console.log('Block clicked:', blockId)
+                                router.push(`/blocks/${blockId}`)
                             }}
                             onBlockUpdate={handleBlockUpdate}
                         />
@@ -1035,12 +1065,19 @@ export default function BlocksPage() {
                                             })()}
                                         </div>
                                         <div className="min-w-0 flex-1">
-                                            <p className={cn(
-                                                "truncate font-medium",
-                                                (status.status === 'done' || status.status === 'skipped') ? "text-zinc-400" : "text-white"
-                                            )}>
-                                                {block.title}
-                                            </p>
+                                            <div className="flex items-center gap-1.5">
+                                                <p className={cn(
+                                                    "truncate font-medium",
+                                                    (status.status === 'done' || status.status === 'skipped') ? "text-zinc-400" : "text-white"
+                                                )}>
+                                                    {block.title}
+                                                </p>
+                                                {block.routine_id && (
+                                                    <Badge variant="ghost" className="h-4 px-1 text-[10px] text-zinc-500 hover:text-zinc-400">
+                                                        🔒
+                                                    </Badge>
+                                                )}
+                                            </div>
                                             <div className="mt-1 flex flex-wrap items-center gap-2">
                                                 <Badge
                                                     variant="outline"
@@ -1168,23 +1205,23 @@ export default function BlocksPage() {
                                                 </Button>
                                             )}
 
-                                            {/* Edit/Details button for completed blocks */}
-                                            {(status.status === 'done' || status.status === 'stopped' || status.status === 'skipped') && (
+                                            {/* Edit/Details button for completed blocks OR all manual blocks */}
+                                            {(status.status === 'done' || status.status === 'stopped' || status.status === 'skipped' || block.source === 'manual') && (
                                                 <Button
                                                     variant="ghost"
                                                     size="sm"
                                                     className="text-zinc-500 hover:text-white"
-                                                    title="View stats & edit"
+                                                    title={block.source === 'manual' && !(status.status === 'done' || status.status === 'stopped' || status.status === 'skipped') ? "Edit block" : "View stats & edit"}
                                                     onClick={() => router.push(`/blocks/${block.id}`)}
                                                 >
                                                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                                     </svg>
                                                 </Button>
                                             )}
 
-                                            {/* Delete button for manual blocks that haven't started */}
-                                            {block.source === 'manual' && (status.status === 'upcoming' || status.status === 'ready') && (
+                                            {/* Delete button for manual blocks that haven't started (and aren't routines) */}
+                                            {block.source === 'manual' && !block.routine_id && (status.status === 'upcoming' || status.status === 'ready') && (
                                                 <Button
                                                     variant="ghost"
                                                     size="sm"
@@ -1237,7 +1274,7 @@ export default function BlocksPage() {
                                             <span className="text-2xl">⏭️</span>
                                             <div className="text-left">
                                                 <p className="font-medium text-zinc-200">I skipped it</p>
-                                                <p className="text-sm text-zinc-500">Didn't get to it this time</p>
+                                                <p className="text-sm text-zinc-500">Didn&apos;t get to it this time</p>
                                             </div>
                                         </button>
 

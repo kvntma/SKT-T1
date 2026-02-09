@@ -1,25 +1,24 @@
 # Current Work Memory
-Last updated: 2026-02-08 19:10 local
+Last updated: 2026-02-08 19:35 local
 
-Ticket: SKT-23 (Bugfix)
+Ticket: SKT-25
 Branch: master
 
 ## Summary
-- Fixed "Stuck on old task/17000 min timer" bug:
-    - Cleared 5 zombie sessions from Jan 25-28 in DB.
-    - Added 24-hour safety limit to `detectActiveSession` query.
-    - Moved `currentSessionId` to global `execution-store` to prevent state loss during navigation.
-    - Added auto-reset if DB session and local store state are inconsistent.
+- Completed SKT-25: General Block Editing.
+- Enabled "Edit" button for all manual blocks in the List view (previously only for completed blocks).
+- Added click-to-edit navigation in the Calendar view.
+- Verified that `[id]/page.tsx` handles both upcoming and completed blocks correctly.
 
 ## Decisions (Do Not Re-litigate)
-- **Session Expiry:** Sessions started >24 hours ago are considered "abandoned" by the UI and will not be restored.
-- **Store Ownership:** `currentSessionId` is now a first-class citizen of `useExecutionStore`.
+- **Edit Access:** Any manual block is now editable. Calendar-synced blocks are editable once a session exists (to preserve original calendar event data until execution).
+- **Calendar UX:** Clicking a block in the calendar is the primary edit trigger.
 
 ## Current State
 - Build passing. ✅
-- DB cleaned up. ✅
-- Robust session restoration implemented. ✅
+- List/Calendar editing verified. ✅
+- Ticket SKT-25 created and closed.
 
 ## Next Steps
-- [ ] Monitor for any "stuck" reports from users.
-- [ ] Proceed with SKT-21 (Retrospective session creation).
+- [ ] Implement retrospective session creation for "Missed" blocks (SKT-21).
+- [ ] Implement auto-transition of Linear issue status on session completion (SKT-22).
