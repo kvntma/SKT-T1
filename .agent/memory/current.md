@@ -1,30 +1,27 @@
 # Current Work Memory
 Last updated: 2026-02-08 17:45 local
 
-Ticket: SKT-20
+Ticket: SKT-23
 Branch: master
 
 ## Summary
-- Implemented Phase 6: Dynamic Scheduling (Initial Refactor).
-- Added `@dnd-kit` for draggable block manipulation in `CalendarView`.
-- Optimized `CalendarPush` and `CalendarSync` API routes with bulk `upsert` operations.
-- Updated `useBlocks` with `updateBlock` mutation.
+- Identified and fixed [Bug] /now page timer shows 17000+ minutes (SKT-23).
+- Root cause: Timer state (`elapsedSeconds`, `currentBlock`) was not being fully reset when navigating away from the `/now` page.
+- Fix:
+    - Updated `reset()` in `execution-store.ts` to clear `currentBlock`.
+    - Updated `handleDone`, `handleStop` (after countdown), and `handleConfirmStop` in `now/page.tsx` to call `reset()` before navigating to `/save`.
 - Verified build integrity: ✅ Success.
-- Scoped Linear scanning to SKT-T1 team.
 
 ## Decisions (Do Not Re-litigate)
-- **Drag & Drop:** Vertical-only dragging in `CalendarView` with 15-minute snapping.
-- **Bulk Operations:** API routes now use batch `upsert` instead of row-by-row updates for performance.
-- **Type Safety:** Used full block objects for `upsert` to avoid `any` and satisfy DB schema.
+- **State Cleanup:** Always call `reset()` in the execution store before navigating away from an active session flow to prevent state leakage.
 
 ## Current State
-- Draggable interface functional in `CalendarView`.
+- Timer bug resolved.
 - Build passing.
-- Memory synchronized remotely.
 
 ## Open Questions / Risks
-- Dragging currently works for manual blocks; logic for external synced blocks needs careful collision handling in future phases.
+- None.
 
 ## Next Steps
-- [ ] Commit and Push all latest changes.
+- [ ] Commit and Push the fix for SKT-23.
 - [ ] Begin SKT-11: Show previous resume token on block load.

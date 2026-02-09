@@ -45,6 +45,7 @@ export const useExecutionStore = create<ExecutionStore>((set) => ({
         set({
             isRunning: false,
             startTime: undefined,
+            currentBlock: undefined,
             elapsedSeconds: 0,
         }),
 

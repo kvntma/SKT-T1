@@ -4,7 +4,8 @@ import { useCurrentBlock } from '@/lib/hooks/useCurrentBlock'
 import { useBlocks } from '@/lib/hooks/useBlocks'
 import { useExecutionStore } from '@/lib/stores/execution-store'
 import { useSession } from '@/lib/hooks/useSession'
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState, useRef } from 'react'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -191,7 +192,7 @@ export default function NowPage() {
                         className="mt-8 h-12 px-6 text-base"
                         asChild
                     >
-                        <a href="/blocks">Manage Blocks</a>
+                        <Link href="/blocks">Manage Blocks</Link>
                     </Button>
                 </div>
             </div>
@@ -223,9 +224,10 @@ export default function NowPage() {
     }
 
     const handleDone = () => {
-        stopTimer()
-        if (currentSessionId) {
-            window.location.href = `/save?outcome=done&sessionId=${currentSessionId}`
+        const sessionId = currentSessionId
+        reset() // Clear store immediately
+        if (sessionId) {
+            window.location.href = `/save?outcome=done&sessionId=${sessionId}`
         } else {
             window.location.href = '/save?outcome=done'
         }
@@ -258,8 +260,10 @@ export default function NowPage() {
                 clearInterval(countdownIntervalRef.current)
             }
             // Navigate to save page
-            if (currentSessionId) {
-                window.location.href = `/save?outcome=aborted&sessionId=${currentSessionId}`
+            const sessionId = currentSessionId
+            reset() // Clear store immediately
+            if (sessionId) {
+                window.location.href = `/save?outcome=aborted&sessionId=${sessionId}`
             } else {
                 window.location.href = '/save?outcome=aborted'
             }
@@ -298,8 +302,10 @@ export default function NowPage() {
         }
 
         // Navigate to save page immediately
-        if (currentSessionId) {
-            window.location.href = `/save?outcome=aborted&sessionId=${currentSessionId}`
+        const sessionId = currentSessionId
+        reset() // Clear store immediately
+        if (sessionId) {
+            window.location.href = `/save?outcome=aborted&sessionId=${sessionId}`
         } else {
             window.location.href = '/save?outcome=aborted'
         }
