@@ -15,7 +15,7 @@ import {
 } from '@dnd-kit/core'
 import { useDraggable } from '@dnd-kit/core'
 import { restrictToVerticalAxis, restrictToFirstScrollableAncestor } from '@dnd-kit/modifiers'
-import { GripVertical, Pencil } from 'lucide-react'
+import { Pencil } from 'lucide-react'
 
 interface DisplayBlock {
     id: string
@@ -105,8 +105,10 @@ function DraggableBlock({ block, style, manualColor, blockCalendarColor, onBlock
     return (
         <div
             ref={setNodeRef}
+            {...listeners}
+            {...attributes}
             className={cn(
-                "absolute rounded-lg p-1 text-left transition-all hover:ring-2 hover:ring-white/20 z-10",
+                "absolute rounded-lg p-2 text-left transition-all hover:ring-2 hover:ring-white/20 z-10",
                 isDragging ? "opacity-50 z-50 ring-2 ring-emerald-500 shadow-xl" : "",
                 block.source === 'manual' && getBlockColor(block.type),
                 "overflow-hidden border-l-2",
@@ -121,20 +123,8 @@ function DraggableBlock({ block, style, manualColor, blockCalendarColor, onBlock
                 } : {})
             }}
         >
-            <div className="flex items-start h-full gap-0.5">
-                {/* Drag Handle */}
-                {block.source === 'manual' && (
-                    <div
-                        {...listeners}
-                        {...attributes}
-                        className="cursor-grab active:cursor-grabbing p-0.5 hover:bg-white/10 rounded shrink-0 self-stretch flex items-center"
-                        title="Drag to reschedule"
-                    >
-                        <GripVertical className="h-3.5 w-3.5 text-white/40" />
-                    </div>
-                )}
-
-                <div className="flex-1 min-w-0 h-full">
+            <div className="relative flex items-center justify-between h-full gap-2">
+                <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5 text-white">
                         {config?.icon && <config.icon className="h-3 w-3 shrink-0" />}
                         <span className="truncate text-xs font-medium">{block.title}</span>
@@ -148,16 +138,17 @@ function DraggableBlock({ block, style, manualColor, blockCalendarColor, onBlock
                     </p>
                 </div>
 
-                {/* Edit Button */}
+                {/* Edit Button - Centered vertically in its container */}
                 <button
+                    onPointerDown={(e) => e.stopPropagation()}
                     onClick={(e) => {
                         e.stopPropagation()
                         onBlockClick?.(block.id)
                     }}
-                    className="p-1 hover:bg-white/20 rounded text-white/60 hover:text-white transition-colors"
+                    className="p-1.5 hover:bg-white/20 rounded-md text-white/60 hover:text-white transition-colors shrink-0"
                     title="Edit block"
                 >
-                    <Pencil className="h-3 w-3" />
+                    <Pencil className="h-3.5 w-3.5" />
                 </button>
             </div>
         </div>
@@ -421,7 +412,7 @@ export function CalendarView({ blocks, viewMode, onBlockClick, onBlockUpdate, co
                                         } : {})
                                     }}
                                 >
-                                    <div className="flex items-start h-full gap-0.5">
+                                    <div className="flex items-center h-full gap-1">
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-1 text-white leading-tight">
                                                 {config?.icon && <config.icon className="h-2.5 w-2.5 shrink-0" />}
@@ -429,14 +420,15 @@ export function CalendarView({ blocks, viewMode, onBlockClick, onBlockUpdate, co
                                             </div>
                                         </div>
                                         <button
+                                            onPointerDown={(e) => e.stopPropagation()}
                                             onClick={(e) => {
                                                 e.stopPropagation()
                                                 onBlockClick?.(block.id)
                                             }}
-                                            className="p-0.5 hover:bg-white/20 rounded text-white/60 hover:text-white transition-colors"
+                                            className="p-0.5 hover:bg-white/20 rounded text-white/60 hover:text-white transition-colors shrink-0"
                                             title="Edit block"
                                         >
-                                            <Pencil className="h-2 w-2" />
+                                            <Pencil className="h-2.5 w-2.5" />
                                         </button>
                                     </div>
                                 </div>
