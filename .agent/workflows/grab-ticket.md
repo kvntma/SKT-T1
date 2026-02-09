@@ -5,7 +5,7 @@ description: Rebuild context fast by reading memory files + current repo state, 
 1) Identify ticket
 - If user provided a ticket ID/URL, use it.
 - Else infer from branch name / recent commits / `.agent/memory/current.md`; if none, use NO_TICKET.
-- If NO_TICKET: propose 3 candidate tickets from Linear (assigned-to-me / recently updated) IF Linear MCP is available; otherwise ask user for ticket.
+- If NO_TICKET: propose 3 candidate tickets from Linear using teamId `4071c41c-6ae2-4046-a717-4c54db67db20` (assigned-to-me / recently updated) IF Linear MCP is available; otherwise ask user for ticket.
 
 2) Load local memory
 - Read `.agent/memory/current.md` if present.

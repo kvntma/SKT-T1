@@ -1,29 +1,26 @@
 # Current Work Memory
-Last updated: 2026-02-08 17:15 local
+Last updated: 2026-02-08 17:30 local
 
-Ticket: SKT-12
+Ticket: NO_TICKET
 Branch: master
 
 ## Summary
-- Completed SKT-13: Session details can now be edited and saved.
-- Completed SKT-12: Handle page refresh mid-session.
-- Fixed build errors caused by missing state variables in `now/page.tsx`.
-- Verified build integrity with `npm run build` (Success).
-- Standardized on "Commit and Push" for all memory updates.
+- Completed SKT-12 and SKT-13.
+- Created follow-up tickets SKT-21 and SKT-22 in Linear.
+- Updated `grab-ticket` workflow to only scan for tickets within the SKT-T1 team (`4071c41c-6ae2-4046-a717-4c54db67db20`).
+- Standardized memory sync: Commit + Push.
 
 ## Decisions (Do Not Re-litigate)
-- **Restoration Priority:** DB session > sessionStorage > current block.
+- **Linear Scoping:** All ticket detection and proposal tools MUST use the SKT-T1 `teamId`.
 - **Git Sync:** Mandatory immediate Git Commit + Push for `.agent/memory`.
 
 ## Current State
-- Build passing.
-- Feature complete for SKT-12 and SKT-13.
-- Memory synchronized with remote.
+- Workflows restricted to SKT-T1 team.
+- Features stable.
 
 ## Open Questions / Risks
 - None.
 
 ## Next Steps
-- [x] Fix build errors.
-- [x] Verify build success.
-- [ ] Determine next task (SKT-11 or other).
+- [ ] Commit and Push workflow/memory updates.
+- [ ] Run `grab-ticket` for the next session.
