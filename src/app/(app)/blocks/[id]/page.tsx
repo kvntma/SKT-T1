@@ -24,7 +24,7 @@ export default function BlockDetailPage() {
     const blockId = params.id as string
 
     const [block, setBlock] = useState<Block | null>(null)
-    const [session, setSession] = useState<{ id: string; actual_start: string; actual_end?: string; time_to_start?: number } | null>(null)
+    const [session, setSession] = useState<{ id: string; actual_start: string; actual_end?: string; time_to_start?: number; outcome?: string; abort_reason?: string; resume_token?: string } | null>(null)
     const [isLoading, setIsLoading] = useState(true)
     const [isSaving, setIsSaving] = useState(false)
     const [isDeleting, setIsDeleting] = useState(false)
@@ -37,6 +37,11 @@ export default function BlockDetailPage() {
     const [linearIssueId, setLinearIssueId] = useState('')
     const [plannedStart, setPlannedStart] = useState('')
     const [plannedEnd, setPlannedEnd] = useState('')
+
+    // Session editable fields
+    const [outcome, setOutcome] = useState<string>('')
+    const [abortReason, setAbortReason] = useState<string>('')
+    const [resumeToken, setResumeToken] = useState<string>('')
 
     useEffect(() => {
         async function loadBlock() {
@@ -67,7 +72,7 @@ export default function BlockDetailPage() {
             // Fetch associated session if exists
             const { data: sessionData } = await supabase
                 .from('sessions')
-                .select('id, actual_start, actual_end, time_to_start')
+                .select('id, actual_start, actual_end, time_to_start, outcome, abort_reason, resume_token')
                 .eq('block_id', blockId)
                 .order('created_at', { ascending: false })
                 .limit(1)
@@ -79,7 +84,13 @@ export default function BlockDetailPage() {
                     actual_start: sessionData.actual_start,
                     actual_end: sessionData.actual_end ?? undefined,
                     time_to_start: sessionData.time_to_start ?? undefined,
+                    outcome: sessionData.outcome ?? undefined,
+                    abort_reason: sessionData.abort_reason ?? undefined,
+                    resume_token: sessionData.resume_token ?? undefined,
                 })
+                setOutcome(sessionData.outcome ?? '')
+                setAbortReason(sessionData.abort_reason ?? '')
+                setResumeToken(sessionData.resume_token ?? '')
             }
 
             setIsLoading(false)
@@ -103,28 +114,47 @@ export default function BlockDetailPage() {
         setIsSaving(true)
 
         const supabase = createClient()
-        const { error } = await supabase
-            .from('blocks')
-            .update({
-                title,
-                type,
-                stop_condition: stopCondition || null,
-                task_link: taskLink || null,
-                linear_issue_id: linearIssueId || null,
-                planned_start: new Date(plannedStart).toISOString(),
-                planned_end: new Date(plannedEnd).toISOString(),
-                updated_at: new Date().toISOString(),
-            })
-            .eq('id', block.id)
+        
+        try {
+            // Update block
+            const { error: blockError } = await supabase
+                .from('blocks')
+                .update({
+                    title,
+                    type,
+                    stop_condition: stopCondition || null,
+                    task_link: taskLink || null,
+                    linear_issue_id: linearIssueId || null,
+                    planned_start: new Date(plannedStart).toISOString(),
+                    planned_end: new Date(plannedEnd).toISOString(),
+                    updated_at: new Date().toISOString(),
+                })
+                .eq('id', block.id)
 
-        if (error) {
-            alert('❌ Failed to save changes')
-            console.error(error)
-        } else {
+            if (blockError) throw blockError
+
+            // Update session if it exists
+            if (session) {
+                const { error: sessionError } = await supabase
+                    .from('sessions')
+                    .update({
+                        outcome: outcome || null,
+                        abort_reason: abortReason || null,
+                        resume_token: resumeToken || null,
+                    })
+                    .eq('id', session.id)
+
+                if (sessionError) throw sessionError
+            }
+
             alert('✅ Block updated!')
             router.push('/blocks')
+        } catch (error) {
+            alert('❌ Failed to save changes')
+            console.error(error)
+        } finally {
+            setIsSaving(false)
         }
-        setIsSaving(false)
     }
 
     async function handleDelete() {
@@ -333,6 +363,51 @@ export default function BlockDetailPage() {
                             />
                             <p className="mt-1 text-xs text-zinc-600">Define what "done" looks like for this block</p>
                         </div>
+
+                        {/* Session Section (if exists) */}
+                        {session && (
+                            <div className="border-t border-zinc-800 pt-4">
+                                <p className="mb-3 text-sm font-medium text-zinc-300">⏱️ Session Details</p>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="mb-2 block text-sm font-medium text-zinc-400">Outcome</label>
+                                        <Select value={outcome} onValueChange={setOutcome}>
+                                            <SelectTrigger className="border-zinc-700 bg-zinc-800/50">
+                                                <SelectValue placeholder="Select outcome" />
+                                            </SelectTrigger>
+                                            <SelectContent className="border-zinc-700 bg-zinc-900">
+                                                <SelectItem value="done">✅ Done</SelectItem>
+                                                <SelectItem value="aborted">⏹️ Stopped</SelectItem>
+                                                <SelectItem value="skipped">⏭️ Skipped</SelectItem>
+                                                <SelectItem value="abandoned">⚠️ Abandoned (Unsaved)</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+
+                                    {(outcome === 'aborted' || outcome === 'skipped' || outcome === 'abandoned') && (
+                                        <div>
+                                            <label className="mb-2 block text-sm font-medium text-zinc-400">Reason</label>
+                                            <Input
+                                                value={abortReason}
+                                                onChange={(e) => setAbortReason(e.target.value)}
+                                                placeholder="Why was it stopped/skipped?"
+                                                className="border-zinc-700 bg-zinc-800/50"
+                                            />
+                                        </div>
+                                    )}
+
+                                    <div>
+                                        <label className="mb-2 block text-sm font-medium text-zinc-400">Next Obvious Step</label>
+                                        <Input
+                                            value={resumeToken}
+                                            onChange={(e) => setResumeToken(e.target.value)}
+                                            placeholder="What's next?"
+                                            className="border-zinc-700 bg-zinc-800/50"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Links Section */}
                         <div className="border-t border-zinc-800 pt-4">

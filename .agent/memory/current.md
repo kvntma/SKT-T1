@@ -1,28 +1,27 @@
 # Current Work Memory
-Last updated: 2026-02-08 15:55 local
+Last updated: 2026-02-08 16:10 local
 
 Ticket: SKT-13
 Branch: master
 
 ## Summary
-- Updated `ralph-workflow` skill and all agent workflows to mandate immediate Git commits for memory file changes.
-- Preparing to implement SKT-13: Edit completed blocks and session details.
-- Verified `[id]/page.tsx` needs session editing fields.
+- Implemented SKT-13: Edit completed blocks and session details.
+- Added session state fields and UI for outcome, abort reason, and resume token in `src/app/(app)/blocks/[id]/page.tsx`.
+- Updated `handleSave` in `[id]/page.tsx` to persist changes to the `sessions` table.
+- Enabled the "Edit" button for both manual and calendar blocks in `src/app/(app)/blocks/page.tsx` when they have a completed/stopped/skipped status.
 
 ## Decisions (Do Not Re-litigate)
-- **Git Sync:** All `.agent/memory` updates must be committed immediately.
-- **SKT-13 UI:** Use session editing UI (outcome, reason, resume token) similar to `/save` page.
+- **Session Editing:** Users can now modify outcome, reason, and next steps for any block that has an associated session.
+- **Edit Accessibility:** The edit button is now available for calendar-synced blocks that have been executed or resolved.
 
 ## Current State
-- Workflow updated to commit memory.
-- `[id]/page.tsx` lacks session editing.
+- SKT-13 implementation complete and ready for testing.
+- Manual and calendar blocks now share the same editing capabilities once a session exists.
 
 ## Open Questions / Risks
 - None.
 
 ## Next Steps
-- [ ] Commit these memory updates.
-- [ ] Add session state fields to `src/app/(app)/blocks/[id]/page.tsx`
-- [ ] Implement UI for session outcome, reason, and resume token in `[id]/page.tsx`
-- [ ] Update `handleSave` in `[id]/page.tsx` to update `sessions` table
-- [ ] Enable "Edit" button for calendar blocks in `src/app/(app)/blocks/page.tsx`
+- [ ] Commit implementation changes.
+- [ ] Verify session editing works correctly in the browser.
+- [ ] Move to the next priority ticket.

@@ -1079,8 +1079,8 @@ export default function BlocksPage() {
                                                 </Button>
                                             )}
 
-                                            {/* Edit/Details button for completed manual blocks */}
-                                            {block.source === 'manual' && (status.status === 'done' || status.status === 'stopped' || status.status === 'skipped') && (
+                                            {/* Edit/Details button for completed blocks */}
+                                            {(status.status === 'done' || status.status === 'stopped' || status.status === 'skipped') && (
                                                 <Button
                                                     variant="ghost"
                                                     size="sm"
