@@ -1,26 +1,29 @@
 # Current Work Memory
-Last updated: 2026-02-08 17:00 local
+Last updated: 2026-02-08 17:15 local
 
 Ticket: SKT-12
 Branch: master
 
 ## Summary
+- Completed SKT-13: Session details can now be edited and saved.
 - Completed SKT-12: Handle page refresh mid-session.
-- Implemented active session detection in `src/app/(app)/now/page.tsx` using a DB check on mount.
-- Restored block, start time, and elapsed duration automatically if an ongoing session exists.
-- Ensured `sessionStorage` overrides are ignored if a database session is found.
+- Fixed build errors caused by missing state variables in `now/page.tsx`.
+- Verified build integrity with `npm run build` (Success).
+- Standardized on "Commit and Push" for all memory updates.
 
 ## Decisions (Do Not Re-litigate)
 - **Restoration Priority:** DB session > sessionStorage > current block.
-- **Visuals:** Timer starts immediately on restore to minimize friction.
+- **Git Sync:** Mandatory immediate Git Commit + Push for `.agent/memory`.
 
 ## Current State
-- SKT-12 implementation complete.
-- Session state persists across refreshes and browser restarts (via DB).
+- Build passing.
+- Feature complete for SKT-12 and SKT-13.
+- Memory synchronized with remote.
 
 ## Open Questions / Risks
 - None.
 
 ## Next Steps
-- [ ] Commit and Push implementation changes.
-- [ ] Verify next ticket or task.
+- [x] Fix build errors.
+- [x] Verify build success.
+- [ ] Determine next task (SKT-11 or other).

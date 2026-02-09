@@ -46,6 +46,12 @@ export default function NowPage() {
     const [overrideBlock, setOverrideBlock] = useState<Block | null>(null)
     const [isRestoring, setIsRestoring] = useState(true)
 
+    // Undo stop functionality
+    const [pendingStop, setPendingStop] = useState(false)
+    const [undoCountdown, setUndoCountdown] = useState(5)
+    const undoTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+    const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null)
+
     // The block to display - prefer override (from blocks page), fallback to current
     const activeBlock = overrideBlock || currentBlock
 
@@ -76,7 +82,7 @@ export default function NowPage() {
                     .limit(1)
                     .single()
 
-                if (sessionData && !sessionError) {
+                if (sessionData && !sessionError && sessionData.actual_start) {
                     const block = sessionData.blocks as unknown as Block
                     const startTime = new Date(sessionData.actual_start)
                     const now = new Date()
