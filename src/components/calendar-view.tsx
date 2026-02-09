@@ -15,7 +15,7 @@ import {
 } from '@dnd-kit/core'
 import { useDraggable } from '@dnd-kit/core'
 import { restrictToVerticalAxis, restrictToFirstScrollableAncestor } from '@dnd-kit/modifiers'
-import { Pencil } from 'lucide-react'
+import { Pencil, Lock, Calendar } from 'lucide-react'
 
 interface DisplayBlock {
     id: string
@@ -27,6 +27,7 @@ interface DisplayBlock {
     source: 'manual' | 'calendar'
     calendar_id?: string | null  // For looking up calendar color
     calendar_link?: string
+    routine_id?: string | null
 }
 
 interface Calendar {
@@ -37,6 +38,7 @@ interface Calendar {
 interface CalendarViewProps {
     blocks: DisplayBlock[]
     viewMode: 'today' | 'week'
+    baseDate?: Date
     onBlockClick?: (blockId: string) => void
     onBlockUpdate?: (id: string, updates: { planned_start: string; planned_end: string }) => void
     colorPrefs?: BlockColorPreferences
@@ -70,9 +72,11 @@ function isSameDay(d1: Date, d2: Date): boolean {
 
 function getWeekDays(baseDate: Date): Date[] {
     const days: Date[] = []
+    // For week view, we start from Sunday of the baseDate week
     const startOfWeek = new Date(baseDate)
     const dayOfWeek = startOfWeek.getDay()
     startOfWeek.setDate(startOfWeek.getDate() - dayOfWeek) // Go to Sunday
+    startOfWeek.setHours(0, 0, 0, 0)
 
     for (let i = 0; i < 7; i++) {
         const day = new Date(startOfWeek)
@@ -93,7 +97,7 @@ interface DraggableBlockProps {
 function DraggableBlock({ block, style, manualColor, blockCalendarColor, onBlockClick }: DraggableBlockProps) {
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
         id: block.id,
-        disabled: block.source === 'calendar',
+        disabled: block.source === 'calendar' || !!block.routine_id,
     })
 
     const config = BLOCK_CONFIGS[block.type]
@@ -112,7 +116,8 @@ function DraggableBlock({ block, style, manualColor, blockCalendarColor, onBlock
                 isDragging ? "opacity-50 z-50 ring-2 ring-emerald-500 shadow-xl" : "",
                 block.source === 'manual' && getBlockColor(block.type),
                 "overflow-hidden border-l-2",
-                block.source === 'manual' && getBlockColorClass(manualColor)
+                block.source === 'manual' && getBlockColorClass(manualColor),
+                block.routine_id && "cursor-default"
             )}
             style={{
                 ...style,
@@ -138,24 +143,41 @@ function DraggableBlock({ block, style, manualColor, blockCalendarColor, onBlock
                     </p>
                 </div>
 
-                {/* Edit Button - Centered vertically in its container with increased visibility */}
-                <button
-                    onPointerDown={(e) => e.stopPropagation()}
-                    onClick={(e) => {
-                        e.stopPropagation()
-                        onBlockClick?.(block.id)
-                    }}
-                    className="p-1.5 bg-black/20 hover:bg-black/40 border border-white/20 hover:border-white/40 rounded-md text-white/80 hover:text-white transition-all shrink-0 shadow-sm"
-                    title="Edit block"
-                >
-                    <Pencil className="h-3.5 w-3.5" />
-                </button>
+                {/* Ternary Action Slot: Edit, Lock, or Calendar */}
+                {block.routine_id ? (
+                    <div className="p-1.5 flex items-center justify-center shrink-0 opacity-60" title="Locked Routine">
+                        <span className="text-xs">🔒</span>
+                    </div>
+                ) : block.source === 'calendar' ? (
+                    <a
+                        href={block.calendar_link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        className="p-1.5 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 hover:border-blue-500/40 rounded-md text-blue-400 transition-all shrink-0 shadow-sm"
+                        title="External Calendar Event"
+                    >
+                        <Calendar className="h-3.5 w-3.5" />
+                    </a>
+                ) : (
+                    <button
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                            e.stopPropagation()
+                            onBlockClick?.(block.id)
+                        }}
+                        className="p-1.5 bg-black/20 hover:bg-black/40 border border-white/20 hover:border-white/40 rounded-md text-white/80 hover:text-white transition-all shrink-0 shadow-sm"
+                        title="Edit block"
+                    >
+                        <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                )}
             </div>
         </div>
     )
 }
 
-export function CalendarView({ blocks, viewMode, onBlockClick, onBlockUpdate, colorPrefs, calendars = [] }: CalendarViewProps) {
+export function CalendarView({ blocks, viewMode, baseDate, onBlockClick, onBlockUpdate, colorPrefs, calendars = [] }: CalendarViewProps) {
     const manualColor = colorPrefs?.manualBlockColor ?? 'emerald'
     const [activeId, setActiveId] = useState<string | null>(null)
 
@@ -181,7 +203,8 @@ export function CalendarView({ blocks, viewMode, onBlockClick, onBlockUpdate, co
     }
 
     const now = useMemo(() => new Date(), [])
-    const weekDays = useMemo(() => getWeekDays(now), [now])
+    const effectiveBaseDate = baseDate || now
+    const weekDays = useMemo(() => getWeekDays(effectiveBaseDate), [effectiveBaseDate])
 
     const getBlockStyle = (block: DisplayBlock, dayIndex?: number) => {
         const start = new Date(block.planned_start)
@@ -258,9 +281,9 @@ export function CalendarView({ blocks, viewMode, onBlockClick, onBlockUpdate, co
     }
 
     if (viewMode === 'today') {
-        const todayBlocks = blocks.filter(block => {
+        const displayBlocks = blocks.filter(block => {
             const blockStart = new Date(block.planned_start)
-            return isSameDay(blockStart, now)
+            return isSameDay(blockStart, effectiveBaseDate)
         })
 
         return (
@@ -284,7 +307,7 @@ export function CalendarView({ blocks, viewMode, onBlockClick, onBlockUpdate, co
                             </div>
                         ))}
 
-                        {currentTimeTop >= 0 && currentTimeTop <= HOURS.length * HOUR_HEIGHT && (
+                        {isSameDay(effectiveBaseDate, now) && currentTimeTop >= 0 && currentTimeTop <= HOURS.length * HOUR_HEIGHT && (
                             <div
                                 className="absolute left-0 right-0 z-20 flex items-center pointer-events-none"
                                 style={{ top: `${currentTimeTop}px` }}
@@ -294,7 +317,7 @@ export function CalendarView({ blocks, viewMode, onBlockClick, onBlockUpdate, co
                             </div>
                         )}
 
-                        {todayBlocks.map((block) => {
+                        {displayBlocks.map((block) => {
                             const style = getBlockStyle(block)
                             const blockCalendarColor = block.source === 'calendar' ? getCalendarColorById(block.calendar_id) : undefined
 
@@ -413,23 +436,34 @@ export function CalendarView({ blocks, viewMode, onBlockClick, onBlockUpdate, co
                                     }}
                                 >
                                     <div className="flex items-center h-full gap-1">
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-1 text-white leading-tight">
-                                                {config?.icon && <config.icon className="h-2.5 w-2.5 shrink-0" />}
-                                                <span className="truncate text-[10px] font-medium">{block.title}</span>
+                                                                                <div className="flex-1 min-w-0">
+                                                                                    <div className="flex items-center gap-1 text-white leading-tight">
+                                                                                        {config?.icon && <config.icon className="h-2.5 w-2.5 shrink-0" />}
+                                                                                        <span className="truncate text-[10px] font-medium">{block.title}</span>
+                                                                                    </div>
+                                                                                </div>
+                                                                                {block.routine_id ? (
+                                                                                    <div className="p-0.5 flex items-center justify-center shrink-0 opacity-60">
+                                                                                        <span className="text-[10px]">🔒</span>
+                                                                                    </div>
+                                                                                ) : block.source === 'calendar' ? (
+                                        
+                                            <div className="p-0.5 text-blue-400/50 shrink-0" title="Calendar Event">
+                                                <Calendar className="h-2.5 w-2.5" />
                                             </div>
-                                        </div>
-                                        <button
-                                            onPointerDown={(e) => e.stopPropagation()}
-                                            onClick={(e) => {
-                                                e.stopPropagation()
-                                                onBlockClick?.(block.id)
-                                            }}
-                                            className="p-0.5 bg-black/20 hover:bg-black/40 border border-white/10 hover:border-white/30 rounded text-white/80 hover:text-white transition-all shrink-0 shadow-sm"
-                                            title="Edit block"
-                                        >
-                                            <Pencil className="h-2.5 w-2.5" />
-                                        </button>
+                                        ) : (
+                                            <button
+                                                onPointerDown={(e) => e.stopPropagation()}
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    onBlockClick?.(block.id)
+                                                }}
+                                                className="p-0.5 bg-black/20 hover:bg-black/40 border border-white/10 hover:border-white/30 rounded text-white/80 hover:text-white transition-all shrink-0 shadow-sm"
+                                                title="Edit block"
+                                            >
+                                                <Pencil className="h-2.5 w-2.5" />
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                             )

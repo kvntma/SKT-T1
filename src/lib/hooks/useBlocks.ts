@@ -12,6 +12,7 @@ interface CreateBlockParams {
     planned_end: string
     stop_condition?: string
     goal_id?: string
+    routine_id?: string
     task_link?: string
     linear_issue_id?: string
 }
@@ -23,29 +24,33 @@ interface UpdateBlockParams {
 
 type BlockView = 'today' | 'week'
 
-export function useBlocks(view: BlockView = 'today') {
+export function useBlocks(view: BlockView = 'today', baseDate: Date = new Date()) {
     const supabase = createClient()
     const queryClient = useQueryClient()
 
-    // Calculate date range based on view
+    // Calculate date range based on view and baseDate
     const getDateRange = () => {
-        const today = new Date()
-        today.setHours(0, 0, 0, 0)
+        const start = new Date(baseDate)
+        start.setHours(0, 0, 0, 0)
 
         if (view === 'week') {
-            const endOfWeek = new Date(today)
-            endOfWeek.setDate(endOfWeek.getDate() + 7)
-            return { start: today, end: endOfWeek }
+            // Align to Sunday for consistent week display
+            const dayOfWeek = start.getDay()
+            start.setDate(start.getDate() - dayOfWeek)
+            
+            const end = new Date(start)
+            end.setDate(end.getDate() + 7)
+            return { start, end }
         }
 
-        const tomorrow = new Date(today)
-        tomorrow.setDate(tomorrow.getDate() + 1)
-        return { start: today, end: tomorrow }
+        const end = new Date(start)
+        end.setDate(end.getDate() + 1)
+        return { start, end }
     }
 
     // Fetch blocks for the selected view with their sessions
     const blocksQuery = useQuery({
-        queryKey: ['blocks', view],
+        queryKey: ['blocks', view, baseDate.toISOString().split('T')[0]],
         queryFn: async () => {
             const { start, end } = getDateRange()
 
