@@ -5,6 +5,10 @@ Ticket: SKT-29
 Branch: master
 
 ## Summary
+- Completed SKT-25: Feature: /now Quickstart & Ad-hoc Execution.
+- Implemented "Quickstart" buttons for common block types (Focus, Admin, Rest).
+- Implemented "Up Next" queue to pull scheduled blocks forward.
+- Updated `NowView` to look ahead 3 days so tomorrow's blocks show up when today is winding down.
 - Completed SKT-29: Bug: Center Active Block in Desktop View.
 - Completed SKT-30: Bug: Blocks View - "Tomorrow" tab loads no items.
 - Fixed date range calculation in `useBlocks` hook to correctly handle any `baseDate`.
