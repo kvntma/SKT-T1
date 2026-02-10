@@ -361,7 +361,7 @@ export default function BlockDetailPage() {
                                 placeholder="e.g., Complete 3 Pomodoros, finish code review"
                                 className="border-zinc-700 bg-zinc-800/50"
                             />
-                            <p className="mt-1 text-xs text-zinc-600">Define what "done" looks like for this block</p>
+                            <p className="mt-1 text-xs text-zinc-600">Define what &quot;done&quot; looks like for this block</p>
                         </div>
 
                         {/* Session Section (if exists) */}

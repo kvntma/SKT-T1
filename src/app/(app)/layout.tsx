@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { BottomNav } from '@/components/bottom-nav'
+import { SidebarNav } from '@/components/sidebar-nav'
 
 export default async function AppLayout({
     children,
@@ -15,11 +16,16 @@ export default async function AppLayout({
     }
 
     return (
-        <div className="min-h-screen bg-zinc-950 text-white">
-            <div className="pb-20">
-                {children}
-            </div>
-            <BottomNav />
+        <div className="min-h-screen bg-zinc-950 text-white flex">
+            <SidebarNav />
+            <main className="flex-1 md:pl-64">
+                <div className="pb-20 md:pb-0">
+                    {children}
+                </div>
+                <div className="md:hidden">
+                    <BottomNav />
+                </div>
+            </main>
         </div>
     )
 }

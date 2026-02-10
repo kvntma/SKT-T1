@@ -19,8 +19,8 @@ export type Database = {
                     linear_issue_id: string | null
                     planned_end: string
                     planned_start: string
+                    routine_id: string | null
                     stop_condition: string | null
-                    task_id: string | null
                     task_link: string | null
                     title: string
                     type: string | null
@@ -35,8 +35,8 @@ export type Database = {
                     linear_issue_id?: string | null
                     planned_end: string
                     planned_start: string
+                    routine_id?: string | null
                     stop_condition?: string | null
-                    task_id?: string | null
                     task_link?: string | null
                     title: string
                     type?: string | null
@@ -64,13 +64,6 @@ export type Database = {
                         columns: ["goal_id"]
                         isOneToOne: false
                         referencedRelation: "goals"
-                        referencedColumns: ["id"]
-                    },
-                    {
-                        foreignKeyName: "blocks_task_id_fkey"
-                        columns: ["task_id"]
-                        isOneToOne: false
-                        referencedRelation: "tasks"
                         referencedColumns: ["id"]
                     },
                 ]
@@ -265,6 +258,53 @@ export type Database = {
                     },
                 ]
             }
+            routines: {
+                Row: {
+                    id: string
+                    user_id: string
+                    title: string
+                    type: string
+                    duration_minutes: number
+                    start_time: string
+                    recurrence: Json
+                    is_hard_non_negotiable: boolean
+                    created_at: string | null
+                    updated_at: string | null
+                }
+                Insert: {
+                    id?: string
+                    user_id: string
+                    title: string
+                    type: string
+                    duration_minutes: number
+                    start_time: string
+                    recurrence: Json
+                    is_hard_non_negotiable?: boolean
+                    created_at?: string | null
+                    updated_at?: string | null
+                }
+                Update: {
+                    id?: string
+                    user_id?: string
+                    title?: string
+                    type?: string
+                    duration_minutes?: number
+                    start_time?: string
+                    recurrence?: Json
+                    is_hard_non_negotiable?: boolean
+                    created_at?: string | null
+                    updated_at?: string | null
+                }
+                Relationships: [
+                    {
+                        foreignKeyName: "routines_user_id_fkey"
+                        columns: ["user_id"]
+                        isOneToOne: false
+                        referencedRelation: "users"
+                        referencedColumns: ["id"]
+                    }
+                ]
+            }
             profiles: {
                 Row: {
                     id: string
@@ -345,6 +385,7 @@ export type Session = Tables<'sessions'>
 export type DailyMetric = Tables<'daily_metrics'>
 export type Task = Tables<'tasks'>
 export type Profile = Tables<'profiles'>
+export type Routine = Tables<'routines'>
 
 // Insert type aliases
 export type InsertGoal = InsertTables<'goals'>
@@ -352,6 +393,7 @@ export type InsertBlock = InsertTables<'blocks'>
 export type InsertSession = InsertTables<'sessions'>
 export type InsertDailyMetric = InsertTables<'daily_metrics'>
 export type InsertTask = InsertTables<'tasks'>
+export type InsertRoutine = InsertTables<'routines'>
 
 // Type enums for type safety
 export type BlockType = 'focus' | 'admin' | 'recovery' | 'busy'

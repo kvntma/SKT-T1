@@ -6,10 +6,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
+import { Input } from '@/components/ui/input'
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select'
 import { useCalendar } from '@/lib/hooks/useCalendar'
 import { useBlockColorPreferences, BLOCK_COLORS, type BlockColor, getBlockColorClass } from '@/lib/hooks/useBlockColorPreferences'
+import { useRoutines, type Routine } from '@/lib/hooks/useRoutines'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
+import { Plus, Trash2, Lock, Unlock, Clock, Calendar as CalendarIcon } from 'lucide-react'
 
 // Color swatch component
 function ColorSwatch({
@@ -120,6 +130,251 @@ function AppearanceSection() {
                 {updatePreferences.isPending && (
                     <p className="text-xs text-emerald-400 text-center">Saving...</p>
                 )}
+            </CardContent>
+        </Card>
+    )
+}
+
+
+// Routines Section Component
+function RoutinesSection() {
+    const { routines, createRoutine, updateRoutine, deleteRoutine, isLoading } = useRoutines()
+    const [isAdding, setIsAdding] = useState(false)
+    const [editingId, setEditingId] = useState<string | null>(null)
+    const [formData, setFormData] = useState({
+        title: '',
+        type: 'focus' as any,
+        start_time: '08:00',
+        duration_minutes: 30,
+        recurrence: { days: [1, 2, 3, 4, 5] }, // Mon-Fri
+        is_hard_non_negotiable: false
+    })
+
+    const DAYS = [
+        { id: 1, label: 'M' },
+        { id: 2, label: 'T' },
+        { id: 3, label: 'W' },
+        { id: 4, label: 'T' },
+        { id: 5, label: 'F' },
+        { id: 6, label: 'S' },
+        { id: 7, label: 'S' },
+    ]
+
+    const handleCreate = async () => {
+        if (!formData.title) return
+        await createRoutine.mutateAsync(formData)
+        setIsAdding(false)
+        resetForm()
+    }
+
+    const handleUpdate = async () => {
+        if (!editingId || !formData.title) return
+        await updateRoutine.mutateAsync({ id: editingId, ...formData })
+        setEditingId(null)
+        resetForm()
+    }
+
+    const resetForm = () => {
+        setFormData({
+            title: '',
+            type: 'focus',
+            start_time: '08:00',
+            duration_minutes: 30,
+            recurrence: { days: [1, 2, 3, 4, 5] },
+            is_hard_non_negotiable: false
+        })
+    }
+
+    const startEditing = (routine: Routine) => {
+        setEditingId(routine.id)
+        setFormData({
+            title: routine.title,
+            type: routine.type as any,
+            start_time: routine.start_time.slice(0, 5),
+            duration_minutes: routine.duration_minutes,
+            recurrence: routine.recurrence as { days: number[] },
+            is_hard_non_negotiable: routine.is_hard_non_negotiable || false
+        })
+        setIsAdding(false)
+    }
+
+    const toggleDay = (dayId: number) => {
+        const days = [...formData.recurrence.days]
+        const index = days.indexOf(dayId)
+        if (index > -1) {
+            days.splice(index, 1)
+        } else {
+            days.push(dayId)
+        }
+        setFormData({ ...formData, recurrence: { days: days.sort() } })
+    }
+
+    return (
+        <Card className="border-zinc-800 bg-zinc-900/80 backdrop-blur-xl">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                <div>
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                        <span>🔄</span> Routines
+                    </CardTitle>
+                    <CardDescription>Recurring non-negotiable blocks</CardDescription>
+                </div>
+                <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => {
+                        if (isAdding || editingId) {
+                            setIsAdding(false)
+                            setEditingId(null)
+                            resetForm()
+                        } else {
+                            setIsAdding(true)
+                        }
+                    }}
+                    className="border-zinc-700 bg-zinc-800/50"
+                >
+                    {isAdding || editingId ? 'Cancel' : <><Plus className="mr-1 h-4 w-4" /> Add</>}
+                </Button>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                {(isAdding || editingId) && (
+                    <div className="space-y-4 rounded-lg border border-zinc-700 bg-zinc-800/30 p-4 animate-in fade-in slide-in-from-top-2">
+                        <div className="grid gap-3">
+                            <Input
+                                placeholder="Routine Title (e.g., Morning Deep Work)"
+                                value={formData.title}
+                                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                                className="border-zinc-700 bg-zinc-900/50"
+                            />
+                            <div className="flex gap-2">
+                                <Input
+                                    type="time"
+                                    value={formData.start_time}
+                                    onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
+                                    className="border-zinc-700 bg-zinc-900/50"
+                                />
+                                <Select
+                                    value={formData.duration_minutes.toString()}
+                                    onValueChange={(val) => setFormData({ ...formData, duration_minutes: parseInt(val) })}
+                                >
+                                    <SelectTrigger className="border-zinc-700 bg-zinc-900/50">
+                                        <SelectValue placeholder="Duration" />
+                                    </SelectTrigger>
+                                    <SelectContent className="bg-zinc-900 border-zinc-700">
+                                        <SelectItem value="15">15 min</SelectItem>
+                                        <SelectItem value="30">30 min</SelectItem>
+                                        <SelectItem value="45">45 min</SelectItem>
+                                        <SelectItem value="60">1 hour</SelectItem>
+                                        <SelectItem value="90">1.5 hours</SelectItem>
+                                        <SelectItem value="120">2 hours</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            
+                            <div className="flex flex-col gap-2">
+                                <label className="text-xs font-medium text-zinc-500">RECURRENCE</label>
+                                <div className="flex gap-1.5">
+                                    {DAYS.map((day) => (
+                                        <button
+                                            key={day.id}
+                                            onClick={() => toggleDay(day.id)}
+                                            className={cn(
+                                                "h-8 w-8 rounded-md text-xs font-bold transition-all",
+                                                formData.recurrence.days.includes(day.id)
+                                                    ? "bg-purple-600 text-white"
+                                                    : "bg-zinc-800 text-zinc-500 hover:bg-zinc-700"
+                                            )}
+                                        >
+                                            {day.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="flex items-center justify-between rounded-md border border-zinc-700/50 bg-zinc-900/30 p-2">
+                                <div className="flex items-center gap-2">
+                                    {formData.is_hard_non_negotiable ? <Lock className="h-3.5 w-3.5 text-amber-500" /> : <Unlock className="h-3.5 w-3.5 text-zinc-500" />}
+                                    <span className="text-sm text-zinc-300">Hard Non-negotiable</span>
+                                </div>
+                                <Switch
+                                    checked={formData.is_hard_non_negotiable}
+                                    onCheckedChange={(val) => setFormData({ ...formData, is_hard_non_negotiable: val })}
+                                />
+                            </div>
+
+                            <Button 
+                                onClick={editingId ? handleUpdate : handleCreate} 
+                                disabled={!formData.title || createRoutine.isPending || updateRoutine.isPending}
+                                className="w-full bg-emerald-600 hover:bg-emerald-500"
+                            >
+                                {createRoutine.isPending || updateRoutine.isPending ? 'Saving...' : editingId ? 'Update Routine' : 'Save Routine'}
+                            </Button>
+                        </div>
+                    </div>
+                )}
+
+                <div className="space-y-2">
+                    {routines.length === 0 && !isLoading && !isAdding && !editingId && (
+                        <p className="py-8 text-center text-sm text-zinc-600 italic">
+                            No routines defined yet.
+                        </p>
+                    )}
+                    {routines.map((routine) => (
+                        <div 
+                            key={routine.id}
+                            className={cn(
+                                "group flex items-center justify-between rounded-lg border p-3 transition-colors",
+                                editingId === routine.id 
+                                    ? "border-emerald-500/50 bg-emerald-500/5" 
+                                    : "border-zinc-800/50 bg-zinc-800/20 hover:border-zinc-700 hover:bg-zinc-800/40"
+                            )}
+                        >
+                            <div className="min-w-0 flex-1" onClick={() => startEditing(routine)} role="button">
+                                <div className="flex items-center gap-2">
+                                    <span className="font-medium text-white">{routine.title}</span>
+                                    {routine.is_hard_non_negotiable && (
+                                        <Badge variant="outline" className="h-4 px-1 text-[10px] border-amber-500/30 bg-amber-500/10 text-amber-500">
+                                            HARD
+                                        </Badge>
+                                    )}
+                                </div>
+                                <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-zinc-500">
+                                    <span className="flex items-center gap-1">
+                                        <Clock className="h-3 w-3" /> {routine.start_time.slice(0, 5)} ({routine.duration_minutes}m)
+                                    </span>
+                                    <span className="flex items-center gap-1">
+                                        <CalendarIcon className="h-3 w-3" />
+                                        {(routine.recurrence as any).days.map((d: number) => DAYS.find(day => day.id === d)?.label).join('')}
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => updateRoutine.mutate({ 
+                                        id: routine.id, 
+                                        is_hard_non_negotiable: !routine.is_hard_non_negotiable 
+                                    })}
+                                    className="h-8 w-8 p-0 text-zinc-500 hover:text-white"
+                                >
+                                    {routine.is_hard_non_negotiable ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                        if (confirm('Delete this routine? This won\'t remove existing blocks.')) {
+                                            deleteRoutine.mutate(routine.id)
+                                        }
+                                    }}
+                                    className="h-8 w-8 p-0 text-zinc-500 hover:text-red-400"
+                                >
+                                    <Trash2 className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
             </CardContent>
         </Card>
     )
@@ -336,6 +591,9 @@ export default function SettingsPage() {
                             </div>
                         </CardContent>
                     </Card>
+
+                    {/* Routines Section */}
+                    <RoutinesSection />
 
                     {/* Appearance */}
                     <AppearanceSection />

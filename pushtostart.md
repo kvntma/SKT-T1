@@ -647,6 +647,8 @@ Failure mode to avoid:
 
 Linear becomes another task dump
 
+
+
 Burndown becomes performative
 
 Issues outnumber actual goals

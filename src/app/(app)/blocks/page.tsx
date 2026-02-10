@@ -32,8 +32,10 @@ import { DateTimePicker } from '@/components/ui/date-time-picker'
 import { createClient } from '@/lib/supabase/client'
 import { useBlockColorPreferences, getBlockColorClass } from '@/lib/hooks/useBlockColorPreferences'
 import { Sparkles, Wand2, Check, X } from 'lucide-react'
+import { useBreakpoint } from '@/lib/hooks/useBreakpoint'
+import { NowView } from '@/components/now-view'
 
-type ViewMode = 'today' | 'week'
+type ViewMode = 'day' | '3day' | 'week'
 type DisplayMode = 'list' | 'calendar'
 
 function getBlockTypeColor(type: string): string {
@@ -123,13 +125,14 @@ export default function BlocksPage() {
     const router = useRouter()
     const queryClient = useQueryClient()
     const supabase = createClient()
-    const [viewMode, setViewMode] = useState<ViewMode>('today')
+    const { isDesktop } = useBreakpoint()
+    const [viewMode, setViewMode] = useState<ViewMode>('day')
     const [selectedDate, setSelectedDate] = useState(() => {
         const d = new Date()
         d.setHours(0, 0, 0, 0)
         return d
     })
-    const { blocks, isLoading, createBlock, updateBlock, deleteBlock } = useBlocks(viewMode, selectedDate)
+    const { blocks, isLoading, createBlock, updateBlock, deleteBlock } = useBlocks(viewMode === 'week' ? 'week' : 'today', selectedDate)
 
     const [isRefactoring, setIsRefactoring] = useState(false)
     const [refactorProposal, setRefactorProposal] = useState<DisplayBlock[] | null>(null)
@@ -180,8 +183,10 @@ export default function BlocksPage() {
 
     const handlePrev = () => {
         const d = new Date(selectedDate)
-        if (viewMode === 'today') {
+        if (viewMode === 'day') {
             d.setDate(d.getDate() - 1)
+        } else if (viewMode === '3day') {
+            d.setDate(d.getDate() - 3)
         } else {
             d.setDate(d.getDate() - 7)
         }
@@ -190,8 +195,10 @@ export default function BlocksPage() {
 
     const handleNext = () => {
         const d = new Date(selectedDate)
-        if (viewMode === 'today') {
+        if (viewMode === 'day') {
             d.setDate(d.getDate() + 1)
+        } else if (viewMode === '3day') {
+            d.setDate(d.getDate() + 3)
         } else {
             d.setDate(d.getDate() + 7)
         }
@@ -205,7 +212,7 @@ export default function BlocksPage() {
     }
 
     const formattedSelectedDate = useMemo(() => {
-        if (viewMode === 'today') {
+        if (viewMode === 'day') {
             const now = new Date()
             if (isSameDay(selectedDate, now)) return 'Today'
             const yesterday = new Date(now)
@@ -215,10 +222,17 @@ export default function BlocksPage() {
             tomorrow.setDate(tomorrow.getDate() + 1)
             if (isSameDay(selectedDate, tomorrow)) return 'Tomorrow'
             return selectedDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-        } else {
+        } else if (viewMode === '3day') {
             const end = new Date(selectedDate)
-            end.setDate(end.getDate() + 6)
+            end.setDate(end.getDate() + 2)
             return `${selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+        } else {
+            const startOfWeek = new Date(selectedDate)
+            const dayOfWeek = startOfWeek.getDay()
+            startOfWeek.setDate(startOfWeek.getDate() - dayOfWeek)
+            const end = new Date(startOfWeek)
+            end.setDate(end.getDate() + 6)
+            return `${startOfWeek.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
         }
     }, [selectedDate, viewMode])
 
@@ -289,20 +303,8 @@ export default function BlocksPage() {
         title: '', type: 'focus', duration: '25', stopCondition: '', startTime: undefined, bufferBefore: '0', bufferAfter: '0'
     })
 
-    const SKIP_REASONS = [
-        { value: 'no_time', label: 'Ran out of time', emoji: '⏰' },
-        { value: 'higher_priority', label: 'Higher priority came up', emoji: '🚨' },
-        { value: 'not_ready', label: 'Wasn\'t ready', emoji: '🤷' },
-        { value: 'energy_low', label: 'Energy too low', emoji: '😴' },
-        { value: 'context_switch', label: 'Too much context switching', emoji: '🔄' },
-        { value: 'forgot', label: 'Forgot', emoji: '🙈' },
-        { value: 'other', label: 'Other', emoji: '✏️' },
-    ]
-
     const [resolveBlockId, setResolveBlockId] = useState<string | null>(null)
     const [resolveStep, setResolveStep] = useState<'choice' | 'skip_reason'>('choice')
-    const [skipReason, setSkipReason] = useState<string>('')
-    const [otherReason, setOtherReason] = useState<string>('')
 
     const handleStart = (blockId: string) => {
         const block = allBlocks.find(b => b.id === blockId)
@@ -335,7 +337,6 @@ export default function BlocksPage() {
                 sessionData.actual_start = block.planned_start
                 sessionData.actual_end = block.planned_end
             }
-            if (outcome === 'skipped' && reason) sessionData.abort_reason = reason
             const { error } = await supabase.from('sessions').insert(sessionData)
             if (error) throw error
             queryClient.invalidateQueries({ queryKey: ['blocks'] })
@@ -416,154 +417,131 @@ export default function BlocksPage() {
     }
 
     return (
-        <div className="min-h-screen px-6 py-8">
-            <div className="mx-auto max-w-2xl">
-                <div className="mb-6 flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold text-white">Blocks</h1>
-                        <p className="mt-1 text-sm text-zinc-500">Manage your time blocks</p>
-                    </div>
-                    <div className="flex gap-2">
-                        <Button
-                            variant="outline"
-                            onClick={handleAIRefactor}
-                            disabled={isRefactoring || allBlocks.length === 0}
-                            className="border-emerald-500/20 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
-                        >
-                            {isRefactoring ? <span className="animate-pulse">Analyzing...</span> : <><Wand2 className="mr-2 h-4 w-4" /> Refactor</>}
-                        </Button>
-                        <Button
-                            onClick={() => {
-                                if (!showCreate) setNewBlock(prev => ({ ...prev, startTime: getDefaultStartTime() }))
-                                setShowCreate(!showCreate)
-                            }}
-                            className="bg-white text-black hover:bg-zinc-200"
-                        >
-                            {showCreate ? 'Cancel' : '+ New Block'}
-                        </Button>
-                    </div>
-                </div>
-
-                <div className="mb-6 flex items-center justify-between bg-zinc-900/50 p-2 rounded-xl border border-zinc-800">
-                    <div className="flex items-center gap-1">
-                        <Button variant="ghost" size="icon" onClick={handlePrev} className="h-8 w-8 text-zinc-400">
-                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={handleToday} className="h-8 text-xs text-zinc-400 hover:text-white">Today</Button>
-                        <Button variant="ghost" size="icon" onClick={handleNext} className="h-8 w-8 text-zinc-400">
-                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-                        </Button>
-                    </div>
-                    <span className="text-sm font-semibold text-white">{formattedSelectedDate}</span>
-                    <div className="flex gap-1 rounded-lg bg-zinc-800 p-1">
-                        <button onClick={() => setViewMode('today')} className={cn("px-3 py-1 text-xs font-medium rounded-md transition-colors", viewMode === 'today' ? "bg-zinc-700 text-white" : "text-zinc-400 hover:text-white")}>Day</button>
-                        <button onClick={() => setViewMode('week')} className={cn("px-3 py-1 text-xs font-medium rounded-md transition-colors", viewMode === 'week' ? "bg-zinc-700 text-white" : "text-zinc-400 hover:text-white")}>Week</button>
-                    </div>
-                </div>
-
-                {refactorProposal && (
-                    <Card className="mb-6 border-emerald-500/50 bg-emerald-500/5 backdrop-blur-xl ring-1 ring-emerald-500/30">
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2 text-emerald-400 text-lg"><Sparkles className="h-5 w-5" /> AI Proposed a New Schedule</CardTitle>
-                            <CardDescription className="text-emerald-400/70">The AI has optimized your remaining blocks.</CardDescription>
-                        </CardHeader>
-                        <CardContent className="flex justify-end gap-3 pt-2">
-                            <Button variant="ghost" size="sm" onClick={() => setRefactorProposal(null)} className="text-zinc-400 hover:text-white"><X className="mr-2 h-4 w-4" /> Discard</Button>
-                            <Button size="sm" onClick={commitRefactor} disabled={isSubmitting} className="bg-emerald-600 text-white hover:bg-emerald-500"><Check className="mr-2 h-4 w-4" /> Apply Changes</Button>
-                        </CardContent>
-                    </Card>
-                )}
-
-                <Card className="mb-6 border-zinc-800 bg-zinc-900/80 backdrop-blur-xl">
-                    <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10">
-                                    <svg className="h-5 w-5 text-blue-400" viewBox="0 0 24 24" fill="currentColor"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zM9 14H7v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2zm-8 4H7v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2z" /></svg>
-                                </div>
-                                <div>
-                                    <p className="font-medium text-white">Google Calendar</p>
-                                    <p className="text-sm text-zinc-500">{isLoadingCalendars ? 'Checking...' : isConnected ? `${events.length} events today` : 'Import events'}</p>
-                                </div>
-                            </div>
-                            {isConnected ? (
-                                <div className="flex items-center gap-2">
-                                    <Badge variant="outline" className="border-emerald-500/20 bg-emerald-500/10 text-emerald-400">✓ Connected</Badge>
-                                    <Button variant="ghost" size="sm" onClick={refreshEvents} disabled={isLoadingEvents} className="text-zinc-400 hover:text-white">
-                                        <svg className={cn("h-4 w-4", isLoadingEvents && "animate-spin")} viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                                    </Button>
-                                    <Button variant="outline" size="sm" onClick={handlePushToCalendar} disabled={isPushingToCalendar} className="border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20">Push</Button>
-                                </div>
-                            ) : <Button onClick={connectCalendar} size="sm" className="bg-blue-600 hover:bg-blue-500" disabled={isLoadingCalendars}>Connect</Button>}
+        <div className={cn("min-h-screen px-4 py-8 md:px-8", isDesktop ? "max-w-none" : "")}>
+            <div className={cn("mx-auto flex gap-8", isDesktop ? "flex-row" : "flex-col max-w-2xl")}>
+                {/* Main Content (Blocks List/Calendar) */}
+                <div className="flex-1 min-w-0">
+                    <div className="mb-6 flex items-center justify-between">
+                        <div>
+                            <h1 className="text-2xl font-bold text-white">Blocks</h1>
+                            <p className="mt-1 text-sm text-zinc-500">Manage your time blocks</p>
                         </div>
-                    </CardContent>
-                </Card>
-
-                {showCreate && (
-                    <Card className="mb-6 border-zinc-800 bg-zinc-900/80 backdrop-blur-xl">
-                        <CardHeader className="relative">
-                            <button onClick={() => setShowCreate(false)} className="absolute right-4 top-4 p-1 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"><X className="h-5 w-5" /></button>
-                            <CardTitle className="text-lg">Create Block</CardTitle>
-                            <CardDescription>Schedule a new time block</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <Input value={newBlock.title} onChange={(e) => setNewBlock({ ...newBlock, title: e.target.value })} placeholder="Title" className="border-zinc-700 bg-zinc-800/50" />
-                            <DateTimePicker value={newBlock.startTime} onChange={(date) => setNewBlock({ ...newBlock, startTime: date })} minDate={getDefaultStartTime()} />
-                            <div className="flex gap-2">
-                                <Select value={newBlock.type} onValueChange={(value: BlockType) => setNewBlock({ ...newBlock, type: value })}><SelectTrigger className="border-zinc-700 bg-zinc-800/50"><SelectValue /></SelectTrigger><SelectContent className="border-zinc-700 bg-zinc-900"><SelectItem value="focus">🎯 Focus</SelectItem><SelectItem value="admin">📋 Admin</SelectItem><SelectItem value="busy">📅 Busy</SelectItem><SelectItem value="recovery">🧘 Recovery</SelectItem></SelectContent></Select>
-                                <Select value={newBlock.duration} onValueChange={(value) => setNewBlock({ ...newBlock, duration: value })}><SelectTrigger className="border-zinc-700 bg-zinc-800/50"><SelectValue /></SelectTrigger><SelectContent className="border-zinc-700 bg-zinc-900"><SelectItem value="15">15 min</SelectItem><SelectItem value="25">25 min</SelectItem><SelectItem value="30">30 min</SelectItem><SelectItem value="45">45 min</SelectItem><SelectItem value="60">1 hour</SelectItem></SelectContent></Select>
-                            </div>
-                            <Button onClick={handleCreate} disabled={!newBlock.title || !newBlock.startTime || isSubmitting} className="w-full bg-emerald-600 hover:bg-emerald-500">{isSubmitting ? 'Creating...' : 'Create Block'}</Button>
-                        </CardContent>
-                    </Card>
-                )}
-
-                <div className="space-y-3">
-                    <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-3">{allBlocks.length > 0 && <p className="text-xs text-zinc-600">{allBlocks.length} block{allBlocks.length !== 1 ? 's' : ''} scheduled</p>}</div>
-                        <div className="flex gap-1 rounded-lg bg-zinc-800 p-1">
-                            <button onClick={() => setDisplayMode('list')} className={cn("p-2 rounded-md transition-colors", displayMode === 'list' ? "bg-zinc-700 text-white" : "text-zinc-400 hover:text-white")}><svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg></button>
-                            <button onClick={() => setDisplayMode('calendar')} className={cn("p-2 rounded-md transition-colors", displayMode === 'calendar' ? "bg-zinc-700 text-white" : "text-zinc-400 hover:text-white")}><svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="18" rx="2" strokeWidth={2} /><path strokeWidth={2} d="M16 2v4M8 2v4M3 10h18" /></svg></button>
+                        <div className="flex gap-2">
+                            <Button
+                                variant="outline"
+                                onClick={handleAIRefactor}
+                                disabled={isRefactoring || allBlocks.length === 0}
+                                className="border-emerald-500/20 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
+                            >
+                                {isRefactoring ? <span className="animate-pulse">Analyzing...</span> : <><Wand2 className="mr-2 h-4 w-4" /> Refactor</>}
+                            </Button>
+                            <Button
+                                onClick={() => {
+                                    if (!showCreate) setNewBlock(prev => ({ ...prev, startTime: getDefaultStartTime() }))
+                                    setShowCreate(!showCreate)
+                                }}
+                                className="bg-white text-black hover:bg-zinc-200"
+                            >
+                                {showCreate ? 'Cancel' : '+ New Block'}
+                            </Button>
                         </div>
                     </div>
 
-                    {isLoading || isLoadingEvents ? (
-                        <div className="flex items-center justify-center py-12"><div className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-700 border-t-white" /></div>
-                    ) : allBlocks.length === 0 ? (
-                        <Card className="border-zinc-800 bg-zinc-900/50"><CardContent className="flex flex-col items-center py-12 text-center"><span className="text-4xl mb-4">📅</span><p className="text-zinc-400">No blocks scheduled for this period</p></CardContent></Card>
-                    ) : displayMode === 'calendar' ? (
-                        <CalendarView blocks={allBlocks} viewMode={viewMode} baseDate={selectedDate} colorPrefs={colorPrefs} calendars={allCalendars} onBlockClick={(id) => router.push(`/blocks/${id}`)} onBlockUpdate={handleBlockUpdate} />
-                    ) : (
-                        allBlocks.map((block) => {
-                            const status = getBlockStatus(block, block.session, currentTime)
-                            const config = getBlockConfig(block.type)
-                            const calendarColor = block.source === 'calendar' ? getCalendarColor(block.calendar_id, allCalendars) : undefined
-                            return (
-                                <Card key={block.id} className={cn("border-zinc-800 bg-zinc-900/80 backdrop-blur-xl transition-colors hover:border-zinc-700 border-l-2", block.source === 'manual' && getBlockColorClass(colorPrefs.manualBlockColor), status.status === 'ready' && isTrackable(block.type) && "ring-1 ring-emerald-500/30", status.status === 'done' && "opacity-60")} style={block.source === 'calendar' ? { borderLeftColor: calendarColor ?? '#71717a' } : undefined}>
-                                    <CardContent className="flex items-center gap-4 p-4">
-                                        <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-800")}>
-                                            {(() => {
-                                                const Icon = (status.status === 'done' ? STATUS_ICONS.done : status.status === 'skipped' ? STATUS_ICONS.skipped : config.icon)
-                                                return <Icon className={cn("h-5 w-5", status.status === 'done' ? "text-emerald-400" : config.color.text)} />
-                                            })()}
-                                        </div>
-                                        <div className="min-w-0 flex-1">
-                                            <p className={cn("truncate font-medium", (status.status === 'done' || status.status === 'skipped') ? "text-zinc-400" : "text-white")}>{block.title}</p>
-                                            <div className="mt-1 flex flex-wrap items-center gap-2">
-                                                <Badge variant="outline" className={cn("text-xs", getBlockTypeColor(block.type))}>{config.label}</Badge>
-                                                <span className="text-xs text-zinc-500">{formatTime(block.planned_start)} - {formatTime(block.planned_end)}</span>
+                    <div className="mb-6 flex items-center justify-between bg-zinc-900/50 p-2 rounded-xl border border-zinc-800">
+                        <div className="flex items-center gap-1">
+                            <Button variant="ghost" size="icon" onClick={handlePrev} className="h-8 w-8 text-zinc-400">
+                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={handleToday} className="h-8 text-xs text-zinc-400 hover:text-white">Today</Button>
+                            <Button variant="ghost" size="icon" onClick={handleNext} className="h-8 w-8 text-zinc-400">
+                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                            </Button>
+                        </div>
+                        <span className="text-sm font-semibold text-white">{formattedSelectedDate}</span>
+                                            <div className="flex gap-1 rounded-lg bg-zinc-800 p-1">
+                                                <button onClick={() => setViewMode('day')} className={cn("px-3 py-1 text-xs font-medium rounded-md transition-colors", viewMode === 'day' ? "bg-zinc-700 text-white" : "text-zinc-400 hover:text-white")}>Day</button>
+                                                <button onClick={() => setViewMode('3day')} className={cn("px-3 py-1 text-xs font-medium rounded-md transition-colors", viewMode === '3day' ? "bg-zinc-700 text-white" : "text-zinc-400 hover:text-white")}>3-Day</button>
+                                                <button onClick={() => setViewMode('week')} className={cn("px-3 py-1 text-xs font-medium rounded-md transition-colors", viewMode === 'week' ? "bg-zinc-700 text-white" : "text-zinc-400 hover:text-white")}>Week</button>
                                             </div>
-                                        </div>
-                                        <div className="flex items-center gap-1">
-                                            {isTrackable(block.type) && status.canStart && <Button size="sm" className="text-xs bg-emerald-600 hover:bg-emerald-500" onClick={() => handleStart(block.id)}>{status.status === 'ready' ? 'Start' : 'Start Early'}</Button>}
-                                            <Button variant="ghost" size="sm" className="text-zinc-500 hover:text-white" onClick={() => router.push(`/blocks/${block.id}`)}><svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg></Button>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            )
-                        })
+                        
+                    </div>
+
+                    {showCreate && (
+                        <Card className="mb-6 border-zinc-800 bg-zinc-900/80 backdrop-blur-xl">
+                            <CardHeader className="relative">
+                                <button onClick={() => setShowCreate(false)} className="absolute right-4 top-4 p-1 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"><X className="h-5 w-5" /></button>
+                                <CardTitle className="text-lg">Create Block</CardTitle>
+                                <CardDescription>Schedule a new time block</CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <Input value={newBlock.title} onChange={(e) => setNewBlock({ ...newBlock, title: e.target.value })} placeholder="Title" className="border-zinc-700 bg-zinc-800/50" />
+                                <DateTimePicker value={newBlock.startTime} onChange={(date) => setNewBlock({ ...newBlock, startTime: date })} minDate={getDefaultStartTime()} />
+                                <div className="flex gap-2">
+                                    <Select value={newBlock.type} onValueChange={(value: BlockType) => setNewBlock({ ...newBlock, type: value })}><SelectTrigger className="border-zinc-700 bg-zinc-800/50"><SelectValue /></SelectTrigger><SelectContent className="border-zinc-700 bg-zinc-900"><SelectItem value="focus">🎯 Focus</SelectItem><SelectItem value="admin">📋 Admin</SelectItem><SelectItem value="busy">📅 Busy</SelectItem><SelectItem value="recovery">🧘 Recovery</SelectItem></SelectContent></Select>
+                                    <Select value={newBlock.duration} onValueChange={(value) => setNewBlock({ ...newBlock, duration: value })}><SelectTrigger className="border-zinc-700 bg-zinc-800/50"><SelectValue /></SelectTrigger><SelectContent className="border-zinc-700 bg-zinc-900"><SelectItem value="15">15 min</SelectItem><SelectItem value="25">25 min</SelectItem><SelectItem value="30">30 min</SelectItem><SelectItem value="45">45 min</SelectItem><SelectItem value="60">1 hour</SelectItem></SelectContent></Select>
+                                </div>
+                                <Button onClick={handleCreate} disabled={!newBlock.title || !newBlock.startTime || isSubmitting} className="w-full bg-emerald-600 hover:bg-emerald-500">{isSubmitting ? 'Creating...' : 'Create Block'}</Button>
+                            </CardContent>
+                        </Card>
                     )}
+
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-3">{allBlocks.length > 0 && <p className="text-xs text-zinc-600">{allBlocks.length} block{allBlocks.length !== 1 ? 's' : ''} scheduled</p>}</div>
+                            <div className="flex gap-1 rounded-lg bg-zinc-800 p-1">
+                                <button onClick={() => setDisplayMode('list')} className={cn("p-2 rounded-md transition-colors", displayMode === 'list' ? "bg-zinc-700 text-white" : "text-zinc-400 hover:text-white")}><svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg></button>
+                                <button onClick={() => setDisplayMode('calendar')} className={cn("p-2 rounded-md transition-colors", displayMode === 'calendar' ? "bg-zinc-700 text-white" : "text-zinc-400 hover:text-white")}><svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="18" rx="2" strokeWidth={2} /><path strokeWidth={2} d="M16 2v4M8 2v4M3 10h18" /></svg></button>
+                            </div>
+                        </div>
+
+                        {isLoading || isLoadingEvents ? (
+                            <div className="flex items-center justify-center py-12"><div className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-700 border-t-white" /></div>
+                        ) : allBlocks.length === 0 ? (
+                            <Card className="border-zinc-800 bg-zinc-900/50"><CardContent className="flex flex-col items-center py-12 text-center"><span className="text-4xl mb-4">📅</span><p className="text-zinc-400">No blocks scheduled for this period</p></CardContent></Card>
+                        ) : displayMode === 'calendar' ? (
+                            <CalendarView blocks={allBlocks} viewMode={viewMode} baseDate={selectedDate} colorPrefs={colorPrefs} calendars={allCalendars} onBlockClick={(id) => router.push(`/blocks/${id}`)} onBlockUpdate={handleBlockUpdate} />
+                        ) : (
+                            allBlocks.map((block) => {
+                                const status = getBlockStatus(block, block.session, currentTime)
+                                const config = getBlockConfig(block.type)
+                                const calendarColor = block.source === 'calendar' ? getCalendarColor(block.calendar_id, allCalendars) : undefined
+                                return (
+                                    <Card key={block.id} className={cn("border-zinc-800 bg-zinc-900/80 backdrop-blur-xl transition-colors hover:border-zinc-700 border-l-2", block.source === 'manual' && getBlockColorClass(colorPrefs.manualBlockColor), status.status === 'ready' && isTrackable(block.type) && "ring-1 ring-emerald-500/30", status.status === 'done' && "opacity-60")} style={block.source === 'calendar' ? { borderLeftColor: calendarColor ?? '#71717a' } : undefined}>
+                                        <CardContent className="flex items-center gap-4 p-4">
+                                            <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-800")}>
+                                                {(() => {
+                                                    const Icon = (status.status === 'done' ? STATUS_ICONS.done : status.status === 'skipped' ? STATUS_ICONS.skipped : config.icon)
+                                                    return <Icon className={cn("h-5 w-5", status.status === 'done' ? "text-emerald-400" : config.color.text)} />
+                                                })()}
+                                            </div>
+                                            <div className="min-w-0 flex-1">
+                                                <p className={cn("truncate font-medium", (status.status === 'done' || status.status === 'skipped') ? "text-zinc-400" : "text-white")}>{block.title}</p>
+                                                <div className="mt-1 flex flex-wrap items-center gap-2">
+                                                    <Badge variant="outline" className={cn("text-xs", getBlockTypeColor(block.type))}>{config.label}</Badge>
+                                                    <span className="text-xs text-zinc-500">{formatTime(block.planned_start)} - {formatTime(block.planned_end)}</span>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-1">
+                                                {isTrackable(block.type) && status.canStart && <Button size="sm" className="text-xs bg-emerald-600 hover:bg-emerald-500" onClick={() => handleStart(block.id)}>{status.status === 'ready' ? 'Start' : 'Start Early'}</Button>}
+                                                <Button variant="ghost" size="sm" className="text-zinc-500 hover:text-white" onClick={() => router.push(`/blocks/${block.id}`)}><svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg></Button>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                )
+                            })
+                        )}
+                    </div>
                 </div>
+
+                {/* Right Panel (NowView) - Only on Desktop */}
+                {isDesktop && (
+                    <div className="w-80 shrink-0">
+                        <div className="sticky top-8">
+                            <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-zinc-500">Execution</h2>
+                            <NowView isCompact />
+                        </div>
+                    </div>
+                )}
             </div>
 
             {resolveBlockId && (
