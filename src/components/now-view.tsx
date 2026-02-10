@@ -38,7 +38,7 @@ function getBlockTypeColor(type: string): string {
 
 export function NowView({ isCompact = false }: { isCompact?: boolean }) {
     const { data: currentBlock, isLoading: currentBlockLoading } = useCurrentBlock()
-    const { blocks, isLoading: blocksLoading, createBlock, updateBlock } = useBlocks()
+    const { blocks, isLoading: blocksLoading, createBlock, updateBlock } = useBlocks('3day')
     const { isRunning, elapsedSeconds, currentSessionId, startTimer, stopTimer, resumeTimer, tick, setCurrentBlock, restoreSession, reset } = useExecutionStore()
     const { startSession, abandonSession, resumeSession, endSession, lastSession } = useSession()
     const [mounted, setMounted] = useState(false)
