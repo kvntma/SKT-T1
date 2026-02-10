@@ -1,7 +1,7 @@
 'use client'
 
 import { useSearchParams, useRouter } from 'next/navigation'
-import { useState, Suspense } from 'react'
+import { useState, Suspense, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
@@ -89,10 +89,12 @@ function SavePageContent() {
     })
 
     // Initialize title when data loads
-    if (sessionData?.blocks && !editedTitle && !isEditingTitle) {
-        // @ts-ignore - manual join type handling
-        setEditedTitle(sessionData.blocks.title)
-    }
+    useEffect(() => {
+        if (sessionData?.blocks && !editedTitle && !isEditingTitle) {
+            const title = sessionData.blocks.title as string
+            setEditedTitle(title)
+        }
+    }, [sessionData, editedTitle, isEditingTitle])
 
     const handleSave = async () => {
         setIsSaving(true)
@@ -100,13 +102,11 @@ function SavePageContent() {
         try {
             // Update block title if changed
             if (sessionId && sessionData?.blocks && editedTitle &&
-                // @ts-ignore
                 editedTitle !== sessionData.blocks.title) {
 
                 await supabase
                     .from('blocks')
                     .update({ title: editedTitle })
-                    // @ts-ignore
                     .eq('id', sessionData.blocks.id)
             }
 
@@ -183,8 +183,7 @@ function SavePageContent() {
                                         className="group relative flex w-full cursor-pointer items-center justify-center rounded-lg border border-transparent bg-zinc-800/30 px-4 py-3 hover:border-zinc-700 hover:bg-zinc-800/50"
                                     >
                                         <span className="text-lg font-medium text-white">
-                                            {// @ts-ignore 
-                                                editedTitle || sessionData.blocks.title}
+                                            {editedTitle || sessionData.blocks.title}
                                         </span>
                                         <Pencil className="absolute right-4 h-4 w-4 text-zinc-500 opacity-0 transition-opacity group-hover:opacity-100" />
                                     </div>

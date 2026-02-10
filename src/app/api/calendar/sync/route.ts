@@ -7,19 +7,6 @@ import { createClient } from '@/lib/supabase/server'
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID!
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET!
 
-interface GoogleEvent {
-    id: string
-    summary: string
-    start: { dateTime?: string; date?: string }
-    end: { dateTime?: string; date?: string }
-    description?: string
-    htmlLink?: string
-}
-
-interface GoogleCalendarEventsResponse {
-    items: GoogleEvent[]
-}
-
 async function refreshAccessToken(refreshToken: string): Promise<string | null> {
     const response = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',
@@ -194,15 +181,15 @@ export async function POST(request: NextRequest) {
     // Perform batch upsert
     const { error: upsertError } = await supabase
         .from('blocks')
-        .upsert(upsertData, { 
+        .upsert(upsertData, {
             onConflict: 'user_id,calendar_id'
         })
 
     if (upsertError) {
         console.error('[Calendar Sync] Batch upsert error:', upsertError)
-        return NextResponse.json({ 
-            error: 'Sync failed during database update', 
-            details: upsertError.message 
+        return NextResponse.json({
+            error: 'Sync failed during database update',
+            details: upsertError.message
         }, { status: 500 })
     }
 

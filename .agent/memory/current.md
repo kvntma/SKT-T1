@@ -1,18 +1,21 @@
 # Current Work Memory
-Last updated: 2026-02-09 22:35 local
+Last updated: 2026-02-09 23:15 local
 
-Ticket: SKT-33 (Allow blocks in PTS to be moved across days)
-Branch: kvntma/skt-33-allow-blocks-in-pts-to-be-moved-across-days-in-calendar-view
+Ticket: SKT-34 (Add collapsible details to execution component)
+Branch: kvntma/skt-34-add-collapsible-details-to-execution-component
 
 ## Summary
-- **Fixed SKT-28**: Resolved issue where short calendar blocks were illegible.
-- **Changes**:
-    - Increased minimum block height to 26px in `CalendarView`.
-    - Added responsive styling in `DraggableBlock` based on height.
-    - Reduced padding (down to `p-0.5`) for short blocks.
-    - Hid time string for blocks under 40px height.
-    - Vertically centered content in short blocks.
+- **Added Collapsible Details to ExecutionPanel**:
+    - Created a new collapsible "Block Details" section in `ExecutionPanel`.
+    - Includes:
+        - Stop Condition or Last Action info.
+        - Linear Issue links (with icon).
+        - External Task links (with icon).
+        - "Next Up" section showing upcoming 3 blocks.
+    - Added `blocks` prop to `ExecutionPanel` and updated `NowView` to pass it.
+    - Used `lucide-react` icons (ChevronDown, ChevronRight, ExternalLink) for better UX.
 
 ## Next Steps
-- [ ] User to verify fix in the calendar view with 15-minute blocks.
-- [ ] Resume work on SKT-31 (Allow Editing Task Name on Completion).
+- [ ] User to verify the new collapsible section in the sidebar on the blocks route.
+- [ ] Check if more metadata (e.g. Linear subtasks) should be integrated into the collapsible.
+- [ ] Resume work on SKT-33 (Allow blocks in PTS to be moved across days) if verified.

@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import {
     Select,
@@ -31,9 +30,10 @@ import { CalendarView } from '@/components/calendar-view'
 import { DateTimePicker } from '@/components/ui/date-time-picker'
 import { createClient } from '@/lib/supabase/client'
 import { useBlockColorPreferences, getBlockColorClass } from '@/lib/hooks/useBlockColorPreferences'
-import { Sparkles, Wand2, Check, X } from 'lucide-react'
+import { Wand2, X, PanelRightClose, PanelRightOpen } from 'lucide-react'
 import { useBreakpoint } from '@/lib/hooks/useBreakpoint'
 import { NowView } from '@/components/now-view'
+import { useUIStore } from '@/lib/stores/ui-store'
 
 type ViewMode = 'day' | '3day' | 'week'
 type DisplayMode = 'list' | 'calendar'
@@ -59,28 +59,6 @@ function formatDate(date: string): string {
         weekday: 'short',
         month: 'short',
         day: 'numeric',
-    })
-}
-
-function formatRelativeTime(dateString: string): string {
-    const date = new Date(dateString)
-    const now = new Date()
-    const diffMs = now.getTime() - date.getTime()
-    const diffMins = Math.floor(diffMs / (1000 * 60))
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
-
-    if (diffMins < 1) return 'just now'
-    if (diffMins < 60) return `${diffMins}m ago`
-    if (diffHours < 24) return `${diffHours}h ago`
-    if (diffDays === 1) return 'yesterday'
-    if (diffDays < 7) return `${diffDays}d ago`
-
-    return date.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
     })
 }
 
@@ -154,6 +132,7 @@ export default function BlocksPage() {
     } = useCalendar()
     const { forceSync, isForceSyncing } = useCalendarSync()
     const { preferences: colorPrefs } = useBlockColorPreferences()
+    const { executionCollapsed, toggleExecution } = useUIStore()
 
     const allBlocks = useMemo<DisplayBlock[]>(() => {
         return blocks.map(block => {
@@ -174,7 +153,7 @@ export default function BlocksPage() {
                 linear_issue_id: block.linear_issue_id,
                 routine_id: block.routine_id,
                 task_link: !isCalendarBlock ? block.task_link : undefined,
-                session: (block as { session?: any }).session ?? null,
+                session: (block as { session?: Record<string, unknown> }).session ?? null,
             }
         }).sort((a, b) =>
             new Date(a.planned_start).getTime() - new Date(b.planned_start).getTime()
@@ -332,10 +311,14 @@ export default function BlocksPage() {
             if (!user) throw new Error('Not authenticated')
             const block = allBlocks.find(b => b.id === resolveBlockId)
             if (!block) throw new Error('Block not found')
-            const sessionData: any = { user_id: user.id, block_id: resolveBlockId, outcome }
-            if (outcome === 'done') {
-                sessionData.actual_start = block.planned_start
-                sessionData.actual_end = block.planned_end
+            const sessionData = {
+                user_id: user.id,
+                block_id: resolveBlockId,
+                outcome,
+                ...(outcome === 'done' && {
+                    actual_start: block.planned_start,
+                    actual_end: block.planned_end,
+                }),
             }
             const { error } = await supabase.from('sessions').insert(sessionData)
             if (error) throw error
@@ -417,7 +400,11 @@ export default function BlocksPage() {
     }
 
     return (
-        <div className={cn("min-h-screen px-4 py-8 md:px-8", isDesktop ? "max-w-none" : "")}>
+        <div className={cn(
+            "min-h-screen px-4 py-8 md:px-8 transition-all duration-300",
+            isDesktop && executionCollapsed ? "md:pr-20" : "",
+            isDesktop ? "max-w-none" : ""
+        )}>
             <div className={cn("mx-auto flex gap-8", isDesktop ? "flex-row" : "flex-col max-w-2xl")}>
                 {/* Main Content (Blocks List/Calendar) */}
                 <div className="flex-1 min-w-0">
@@ -540,11 +527,39 @@ export default function BlocksPage() {
 
                 {/* Right Panel (NowView) - Only on Desktop */}
                 {isDesktop && (
-                    <div className="w-80 shrink-0">
-                        <div className="sticky top-8">
-                            <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-zinc-500">Execution</h2>
-                            <NowView isCompact />
-                        </div>
+                    <div className={cn(
+                        "shrink-0 transition-all duration-300 relative",
+                        executionCollapsed ? "w-0 overflow-hidden" : "w-80"
+                    )}>
+                        {!executionCollapsed && (
+                            <div className="sticky top-8">
+                                <div className="mb-4 flex items-center justify-between">
+                                    <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-500">Execution</h2>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={toggleExecution}
+                                        className="h-8 w-8 text-zinc-500 hover:text-white"
+                                    >
+                                        <PanelRightClose className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                                <NowView isCompact />
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {isDesktop && executionCollapsed && (
+                    <div className="fixed right-8 top-8 z-40">
+                        <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={toggleExecution}
+                            className="bg-zinc-900/80 border-zinc-800 text-zinc-400 hover:text-white backdrop-blur-sm"
+                        >
+                            <PanelRightOpen className="h-4 w-4" />
+                        </Button>
                     </div>
                 )}
             </div>

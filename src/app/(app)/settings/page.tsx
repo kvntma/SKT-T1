@@ -19,6 +19,7 @@ import { useBlockColorPreferences, BLOCK_COLORS, type BlockColor, getBlockColorC
 import { useRoutines, type Routine } from '@/lib/hooks/useRoutines'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
+import { type BlockType } from '@/lib/blocks/config'
 import { Plus, Trash2, Lock, Unlock, Clock, Calendar as CalendarIcon } from 'lucide-react'
 
 // Color swatch component
@@ -143,7 +144,7 @@ function RoutinesSection() {
     const [editingId, setEditingId] = useState<string | null>(null)
     const [formData, setFormData] = useState({
         title: '',
-        type: 'focus' as any,
+        type: 'focus' as BlockType,
         start_time: '08:00',
         duration_minutes: 30,
         recurrence: { days: [1, 2, 3, 4, 5] }, // Mon-Fri
@@ -177,7 +178,7 @@ function RoutinesSection() {
     const resetForm = () => {
         setFormData({
             title: '',
-            type: 'focus',
+            type: 'focus' as BlockType,
             start_time: '08:00',
             duration_minutes: 30,
             recurrence: { days: [1, 2, 3, 4, 5] },
@@ -189,7 +190,7 @@ function RoutinesSection() {
         setEditingId(routine.id)
         setFormData({
             title: routine.title,
-            type: routine.type as any,
+            type: routine.type as BlockType,
             start_time: routine.start_time.slice(0, 5),
             duration_minutes: routine.duration_minutes,
             recurrence: routine.recurrence as { days: number[] },
@@ -343,7 +344,7 @@ function RoutinesSection() {
                                     </span>
                                     <span className="flex items-center gap-1">
                                         <CalendarIcon className="h-3 w-3" />
-                                        {(routine.recurrence as any).days.map((d: number) => DAYS.find(day => day.id === d)?.label).join('')}
+                                        {(routine.recurrence as { days: number[] }).days.map((d: number) => DAYS.find(day => day.id === d)?.label).join('')}
                                     </span>
                                 </div>
                             </div>

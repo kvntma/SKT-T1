@@ -136,7 +136,7 @@ function DraggableBlock({ block, style, manualColor, blockCalendarColor, onClick
             ref={setNodeRef}
             {...listeners}
             {...attributes}
-            onClick={(e) => {
+            onClick={() => {
                 // Prevent drag click from triggering if dragging happened (handled by dnd-kit usually, but check)
                 if (!isDragging) onClick?.()
             }}

@@ -24,6 +24,7 @@ export interface Block {
     task_link?: string
     stop_condition?: string
     linear_issue_id?: string
+    routine_id?: string
     is_quick_add?: boolean
     created_at: string
 }

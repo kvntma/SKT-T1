@@ -2,14 +2,14 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
-import type { Block } from '@/types'
+import type { Block, Session } from '@/types'
 
 export function useCurrentBlock() {
     const supabase = createClient()
 
     return useQuery({
         queryKey: ['currentBlock'],
-        queryFn: async (): Promise<(Block & { session?: any }) | null> => {
+        queryFn: async (): Promise<(Block & { session?: Session | null }) | null> => {
             const now = new Date().toISOString()
 
             // Fetch blocks that overlap with current time
@@ -54,10 +54,10 @@ export function useCurrentBlock() {
             // Return the block with its most recent session (if any)
             return {
                 ...activeBlock,
-                session: activeBlock.sessions?.sort((a: any, b: any) => 
+                session: (activeBlock.sessions as Session[])?.sort((a, b) => 
                     new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
                 )[0] || null
-            } as any
+            } as Block & { session?: Session | null }
         },
         refetchInterval: 60000, // Refetch every minute
     })

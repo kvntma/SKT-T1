@@ -156,8 +156,9 @@ export default function BlockDetailPage() {
 
             toast.success('Block updated!')
             router.push('/blocks')
-        } catch (error: any) {
-            toast.error(error.message || 'Failed to save changes')
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Failed to save changes'
+            toast.error(message)
             console.error(error)
         } finally {
             setIsSaving(false)

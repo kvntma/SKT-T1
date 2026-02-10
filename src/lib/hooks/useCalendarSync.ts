@@ -52,10 +52,10 @@ export function useCalendarSync() {
 
     // Auto-sync on mount when calendar is connected
     useEffect(() => {
-        if (isConnected && !syncMutation.isPending && !syncMutation.isSuccess) {
+        if (isConnected && !syncMutation.isPending && !syncMutation.isSuccess && !syncMutation.isError) {
             syncMutation.mutate()
         }
-    }, [isConnected])
+    }, [isConnected, syncMutation])
 
     return {
         isSyncing: syncMutation.isPending || forceSyncMutation.isPending,

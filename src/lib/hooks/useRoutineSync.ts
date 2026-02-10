@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRoutines } from './useRoutines'
 import { useQueryClient } from '@tanstack/react-query'
+import type { Block } from '@/types'
+import type { InsertBlock } from '@/types/database'
 
 export function useRoutineSync() {
     const supabase = createClient()
@@ -43,7 +45,7 @@ export function useRoutineSync() {
                     }) || []
                 )
 
-                const blocksToInsert: any[] = []
+                const blocksToInsert: InsertBlock[] = []
 
                 // 2. Iterate through next 7 days and identify missing blocks
                 for (let i = 0; i < 7; i++) {
@@ -69,7 +71,7 @@ export function useRoutineSync() {
                             user_id: user.id,
                             routine_id: routine.id,
                             title: routine.title,
-                            type: routine.type,
+                            type: routine.type as Block['type'],
                             planned_start: plannedStart.toISOString(),
                             planned_end: plannedEnd.toISOString(),
                         })
@@ -90,6 +92,9 @@ export function useRoutineSync() {
         }
 
         syncRoutines()
+        // We intentionally omit isSyncing from dependencies to avoid re-triggering 
+        // when the sync finishes and sets isSyncing to false.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [routines, isLoadingRoutines, queryClient, supabase])
 
     return { isSyncing }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 
@@ -83,20 +83,8 @@ export function useCalendar() {
         retry: false,
     })
 
-    // Auto-select primary calendar when calendars load (if no selection yet)
-    useEffect(() => {
-        if (calendarsQuery.data?.calendars && syncedCalendarIds.length === 0) {
-            const primary = calendarsQuery.data.calendars.find(c => c.primary)
-            if (primary) {
-                setSyncedCalendarIds([primary.id])
-                // Save to DB
-                saveSyncedCalendars([primary.id])
-            }
-        }
-    }, [calendarsQuery.data?.calendars])
-
     // Save synced calendars to database
-    const saveSyncedCalendars = async (ids: string[]) => {
+    const saveSyncedCalendars = useCallback(async (ids: string[]) => {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) {
             console.error('[useCalendar] No user found when saving synced calendars')
@@ -122,7 +110,20 @@ export function useCalendar() {
         } else {
             console.log('[useCalendar] Successfully saved synced calendars')
         }
-    }
+    }, [supabase])
+
+    // Auto-select primary calendar when calendars load (if no selection yet)
+    useEffect(() => {
+        if (calendarsQuery.data?.calendars && syncedCalendarIds.length === 0) {
+            const primary = calendarsQuery.data.calendars.find(c => c.primary)
+            if (primary) {
+                // eslint-disable-next-line react-hooks/set-state-in-effect
+                setSyncedCalendarIds([primary.id])
+                // Save to DB
+                saveSyncedCalendars([primary.id])
+            }
+        }
+    }, [calendarsQuery.data?.calendars, syncedCalendarIds.length, saveSyncedCalendars])
 
     // Toggle a calendar's sync state
     const toggleCalendar = useMutation({
