@@ -38,7 +38,7 @@ function getBlockTypeColor(type: string): string {
 
 export function NowView({ isCompact = false }: { isCompact?: boolean }) {
     const { data: currentBlock, isLoading: currentBlockLoading } = useCurrentBlock()
-    const { blocks, isLoading: blocksLoading } = useBlocks()
+    const { blocks, isLoading: blocksLoading, createBlock, updateBlock } = useBlocks()
     const { isRunning, elapsedSeconds, currentSessionId, startTimer, stopTimer, resumeTimer, tick, setCurrentBlock, restoreSession, reset } = useExecutionStore()
     const { startSession, abandonSession, resumeSession, endSession, lastSession } = useSession()
     const [mounted, setMounted] = useState(false)
@@ -110,7 +110,7 @@ export function NowView({ isCompact = false }: { isCompact?: boolean }) {
 
     // Check for startBlockId in sessionStorage on mount
     useEffect(() => {
-        if (!mounted || !isRestoring) return 
+        if (!mounted || !isRestoring) return
 
         if (currentSessionId) {
             sessionStorage.removeItem('startBlockId')
@@ -161,6 +161,59 @@ export function NowView({ isCompact = false }: { isCompact?: boolean }) {
 
     const isLoading = currentBlockLoading || blocksLoading
 
+    // Handlers for Quickstart
+    const handleQuickStart = async (type: 'focus' | 'admin' | 'recovery', minutes: number) => {
+        const now = new Date()
+        const end = new Date(now.getTime() + minutes * 60000)
+
+        try {
+            const newBlock = await createBlock.mutateAsync({
+                title: `Quick ${type.charAt(0).toUpperCase() + type.slice(1)}`,
+                type,
+                planned_start: now.toISOString(),
+                planned_end: end.toISOString(),
+            })
+
+            setOverrideBlock(newBlock as unknown as Block)
+
+            // Start session immediately
+            const session = await startSession.mutateAsync({
+                blockId: newBlock.id,
+                timeToStart: 0,
+            })
+            startTimer(session.id)
+        } catch (error) {
+            console.error('Failed to quickstart:', error)
+        }
+    }
+
+    const handleStartEarly = async (block: Block) => {
+        try {
+            // Update the block to start now
+            const now = new Date()
+            const currentDuration = new Date(block.planned_end).getTime() - new Date(block.planned_start).getTime()
+            const newEnd = new Date(now.getTime() + currentDuration)
+
+            const updatedBlock = await updateBlock.mutateAsync({
+                id: block.id,
+                updates: {
+                    planned_start: now.toISOString(),
+                    planned_end: newEnd.toISOString()
+                }
+            })
+
+            setOverrideBlock(updatedBlock as unknown as Block)
+
+            const session = await startSession.mutateAsync({
+                blockId: updatedBlock.id,
+                timeToStart: 0,
+            })
+            startTimer(session.id)
+        } catch (error) {
+            console.error('Failed to start early:', error)
+        }
+    }
+
     if (!mounted || isLoading) {
         return (
             <div className="flex h-full items-center justify-center">
@@ -172,16 +225,129 @@ export function NowView({ isCompact = false }: { isCompact?: boolean }) {
     }
 
     if (!activeBlock) {
+        // Find upcoming blocks
+        const now = new Date()
+        const upcomingBlocks = blocks
+            .filter(b => new Date(b.planned_start) > now)
+            .sort((a, b) => new Date(a.planned_start).getTime() - new Date(b.planned_start).getTime())
+            .slice(0, 5)
+
+        const nextBlock = upcomingBlocks[0]
+        const isEarlyStartAvailable = nextBlock &&
+            (new Date(nextBlock.planned_start).getTime() - now.getTime() < 60 * 60 * 1000) // Within 60 mins
+
         return (
-            <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
-                <div className="relative z-10 flex flex-col items-center">
-                    <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-zinc-900 text-3xl shadow-xl ring-1 ring-zinc-800">
-                        ⏸️
+            <div className="flex flex-1 flex-col items-center justify-center px-6 pb-20 text-center">
+                <div className="relative z-10 w-full max-w-md flex flex-col items-center animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    {/* Status Indicator */}
+                    <div className="mb-8 flex flex-col items-center">
+                        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-zinc-900 text-3xl shadow-xl ring-1 ring-zinc-800">
+                            ⏸️
+                        </div>
+                        <h2 className="text-lg font-medium text-zinc-400">No Active Block</h2>
                     </div>
-                    <h1 className="text-xl font-bold text-white">No Active Block</h1>
-                    <p className="mt-2 max-w-xs text-sm text-zinc-400">
-                        You don&apos;t have a scheduled block right now.
-                    </p>
+
+                    <h1 className="mb-6 text-2xl font-bold text-white">What are you doing?</h1>
+
+                    {/* Quick Buckets */}
+                    <div className="grid w-full grid-cols-3 gap-3 mb-8">
+                        <button
+                            onClick={() => handleQuickStart('focus', 25)}
+                            className="flex flex-col items-center justify-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4 transition-all hover:bg-emerald-500/20 active:scale-95"
+                        >
+                            <span className="text-2xl">🎯</span>
+                            <div className="flex flex-col">
+                                <span className="text-sm font-semibold text-emerald-400">Focus</span>
+                                <span className="text-[10px] text-emerald-500/70">25m</span>
+                            </div>
+                        </button>
+                        <button
+                            onClick={() => handleQuickStart('admin', 15)}
+                            className="flex flex-col items-center justify-center gap-2 rounded-xl border border-blue-500/20 bg-blue-500/10 p-4 transition-all hover:bg-blue-500/20 active:scale-95"
+                        >
+                            <span className="text-2xl">📋</span>
+                            <div className="flex flex-col">
+                                <span className="text-sm font-semibold text-blue-400">Admin</span>
+                                <span className="text-[10px] text-blue-500/70">15m</span>
+                            </div>
+                        </button>
+                        <button
+                            onClick={() => handleQuickStart('recovery', 5)}
+                            className="flex flex-col items-center justify-center gap-2 rounded-xl border border-purple-500/20 bg-purple-500/10 p-4 transition-all hover:bg-purple-500/20 active:scale-95"
+                        >
+                            <span className="text-2xl">🧘</span>
+                            <div className="flex flex-col">
+                                <span className="text-sm font-semibold text-purple-400">Rest</span>
+                                <span className="text-[10px] text-purple-500/70">5m</span>
+                            </div>
+                        </button>
+                    </div>
+
+                    {/* Early Start / Upcoming */}
+                    {upcomingBlocks.length > 0 && (
+                        <div className="w-full space-y-3 text-left">
+                            <h2 className="text-xs font-medium uppercase tracking-wider text-zinc-500 ml-1">
+                                {isEarlyStartAvailable ? 'Up Next' : 'Upcoming'}
+                            </h2>
+
+                            {isEarlyStartAvailable ? (
+                                // Hero Card for Next Block
+                                <Card className="w-full border-zinc-700 bg-zinc-800/50 backdrop-blur-xl transition-all hover:border-zinc-600">
+                                    <CardContent className="p-4">
+                                        <div className="flex items-center gap-4">
+                                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-zinc-700/50 text-2xl">
+                                                {getBlockTypeEmoji(nextBlock.type || 'focus')}
+                                            </div>
+                                            <div className="min-w-0 flex-1">
+                                                <h3 className="truncate text-lg font-semibold text-white">
+                                                    {nextBlock.title}
+                                                </h3>
+                                                <div className="mt-1 flex items-center gap-2">
+                                                    <Badge variant="outline" className={cn("text-[10px] py-0", getBlockTypeColor(nextBlock.type || 'focus'))}>
+                                                        {nextBlock.type}
+                                                    </Badge>
+                                                    <span className="text-xs text-zinc-400">
+                                                        {new Date(nextBlock.planned_start).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <Button
+                                                onClick={() => handleStartEarly(nextBlock as unknown as Block)}
+                                                size="sm"
+                                                className="shrink-0 bg-white text-zinc-900 hover:bg-zinc-200"
+                                            >
+                                                Start Now
+                                            </Button>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            ) : (
+                                // Simple List for future blocks
+                                <div className="space-y-2">
+                                    {upcomingBlocks.map(block => (
+                                        <div
+                                            key={block.id}
+                                            onClick={() => handleStartEarly(block as unknown as Block)}
+                                            className="group flex cursor-pointer items-center gap-3 rounded-lg border border-transparent bg-zinc-900/50 p-3 transition-colors hover:border-zinc-700 hover:bg-zinc-800"
+                                        >
+                                            <span className="text-lg">{getBlockTypeEmoji(block.type || 'focus')}</span>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="truncate text-sm font-medium text-zinc-300 group-hover:text-white">
+                                                    {block.title}
+                                                </p>
+                                                <p className="text-[10px] text-zinc-500">
+                                                    {new Date(block.planned_start).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                                                </p>
+                                            </div>
+                                            <span className="opacity-0 group-hover:opacity-100 text-xs text-zinc-400">
+                                                Start
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
         )
@@ -210,7 +376,7 @@ export function NowView({ isCompact = false }: { isCompact?: boolean }) {
 
     const handleDone = () => {
         const sessionId = currentSessionId
-        reset() 
+        reset()
         if (sessionId) {
             window.location.href = `/save?outcome=done&sessionId=${sessionId}`
         } else {

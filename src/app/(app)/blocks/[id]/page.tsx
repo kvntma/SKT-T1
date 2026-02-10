@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import { Block, BlockType } from '@/types/database'
+import { toast } from 'sonner'
 
 const BLOCK_CONFIGS = {
     focus: { label: 'Focus', emoji: '🎯', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
@@ -114,8 +115,14 @@ export default function BlockDetailPage() {
         setIsSaving(true)
 
         const supabase = createClient()
-        
+
         try {
+            if (!plannedStart || !plannedEnd) {
+                toast.error('Start and end times are required')
+                setIsSaving(false)
+                return
+            }
+
             // Update block
             const { error: blockError } = await supabase
                 .from('blocks')
@@ -147,10 +154,10 @@ export default function BlockDetailPage() {
                 if (sessionError) throw sessionError
             }
 
-            alert('✅ Block updated!')
+            toast.success('Block updated!')
             router.push('/blocks')
-        } catch (error) {
-            alert('❌ Failed to save changes')
+        } catch (error: any) {
+            toast.error(error.message || 'Failed to save changes')
             console.error(error)
         } finally {
             setIsSaving(false)
@@ -171,10 +178,11 @@ export default function BlockDetailPage() {
         const { error } = await supabase.from('blocks').delete().eq('id', block.id)
 
         if (error) {
-            alert('❌ Failed to delete block')
+            toast.error('Failed to delete block')
             console.error(error)
             setIsDeleting(false)
         } else {
+            toast.success('Block deleted')
             router.push('/blocks')
         }
     }
