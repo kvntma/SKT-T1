@@ -9,23 +9,55 @@ export function useCurrentBlock() {
 
     return useQuery({
         queryKey: ['currentBlock'],
-        queryFn: async (): Promise<Block | null> => {
+        queryFn: async (): Promise<(Block & { session?: any }) | null> => {
             const now = new Date().toISOString()
 
+            // Fetch blocks that overlap with current time
             const { data, error } = await supabase
                 .from('blocks')
-                .select('*')
+                .select(`
+                    *,
+                    sessions (
+                        id,
+                        outcome,
+                        actual_start,
+                        actual_end,
+                        created_at
+                    )
+                `)
                 .lte('planned_start', now)
                 .gte('planned_end', now)
                 .order('planned_start', { ascending: false })
-                .limit(1)
-                .maybeSingle()
 
             if (error) {
                 throw error
             }
 
-            return data as Block | null
+            if (!data || data.length === 0) return null
+
+            // Find the first block that doesn't have a completed session
+            const activeBlock = data.find(block => {
+                const sessions = block.sessions || []
+                if (sessions.length === 0) return true
+                
+                // If any session is 'done', 'aborted', or 'skipped', the block is finished
+                const isFinished = sessions.some(s => 
+                    s.outcome === 'done' || 
+                    s.outcome === 'aborted' || 
+                    s.outcome === 'skipped'
+                )
+                return !isFinished
+            })
+
+            if (!activeBlock) return null
+
+            // Return the block with its most recent session (if any)
+            return {
+                ...activeBlock,
+                session: activeBlock.sessions?.sort((a: any, b: any) => 
+                    new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+                )[0] || null
+            } as any
         },
         refetchInterval: 60000, // Refetch every minute
     })

@@ -296,7 +296,7 @@ function SavePageContent() {
                 <Button
                     variant="ghost"
                     className="w-full text-zinc-500 hover:text-white"
-                    onClick={() => router.push('/now')}
+                    onClick={handleSave}
                 >
                     Skip for now
                 </Button>
