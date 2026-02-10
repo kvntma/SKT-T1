@@ -1,14 +1,16 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import type { Block } from '@/types'
-import { Pencil, Plus, Minus, Check, X, ChevronDown, ChevronRight, ExternalLink } from 'lucide-react'
+import { Pencil, Plus, Minus, Check, X, ChevronDown, ChevronRight, ExternalLink, AlertTriangle } from 'lucide-react'
 import { formatTime, getBlockTypeEmoji, getBlockTypeColor } from './utils'
+import { useNotificationStore } from '@/lib/stores/notification-store'
+import { playBellSound } from '@/lib/sounds'
 
 interface ExecutionPanelProps {
     isCompact: boolean
@@ -66,19 +68,48 @@ export function ExecutionPanel({
     onCancelEditing,
 }: ExecutionPanelProps) {
     const [isExpanded, setIsExpanded] = useState(false)
+    const bellPlayedRef = useRef(false)
+    const {
+        timerExceededSound,
+        timerExceededFlash,
+        blockCollisionWarning,
+        blockCollisionMinutes,
+        volume,
+    } = useNotificationStore()
 
     // Timer Visuals
     const radius = 120
     const circumference = 2 * Math.PI * radius
     const totalDuration = (new Date(activeBlock.planned_end).getTime() - new Date(activeBlock.planned_start).getTime()) / 1000
+    const isOvertime = elapsedSeconds > totalDuration && isRunning
     const progress = Math.min(Math.max(elapsedSeconds / totalDuration, 0), 1)
     const strokeDashoffset = circumference - progress * circumference
     const durationMinutes = Math.round((new Date(activeBlock.planned_end).getTime() - new Date(activeBlock.planned_start).getTime()) / 60000)
+    const overtimeSeconds = isOvertime ? Math.floor(elapsedSeconds - totalDuration) : 0
 
     const upcomingBlocks = blocks
         .filter(b => new Date(b.planned_start) > new Date() && b.id !== activeBlock.id)
         .sort((a, b) => new Date(a.planned_start).getTime() - new Date(b.planned_start).getTime())
         .slice(0, 3)
+
+    // Next block collision detection
+    const nextBlock = upcomingBlocks[0]
+    const minutesToNextBlock = nextBlock
+        ? (new Date(nextBlock.planned_start).getTime() - Date.now()) / 60000
+        : Infinity
+    const isCollisionWarning = blockCollisionWarning && minutesToNextBlock <= blockCollisionMinutes && minutesToNextBlock > 0
+
+    // Play bell sound once when timer exceeds duration
+    useEffect(() => {
+        if (isOvertime && timerExceededSound && !bellPlayedRef.current) {
+            bellPlayedRef.current = true
+            playBellSound(volume)
+        }
+        // Reset when block changes or timer resets
+        if (!isRunning || elapsedSeconds === 0) {
+            bellPlayedRef.current = false
+        }
+    }, [isOvertime, timerExceededSound, volume, isRunning, elapsedSeconds])
 
     return (
         <div className={cn("relative z-10 flex w-full flex-col items-center", isCompact ? "" : "max-w-sm")}>
@@ -176,19 +207,55 @@ export function ExecutionPanel({
                 </CardContent>
             </Card>
 
+            {/* Block Collision Warning */}
+            {isCollisionWarning && nextBlock && (
+                <div className="mb-3 w-full flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 animate-in fade-in slide-in-from-top-1">
+                    <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400" />
+                    <div className="min-w-0 flex-1">
+                        <p className="text-xs font-medium text-amber-300">
+                            Next block in {Math.ceil(minutesToNextBlock)} min
+                        </p>
+                        <p className="truncate text-[10px] text-amber-400/70">
+                            {nextBlock.title}
+                        </p>
+                    </div>
+                </div>
+            )}
+
             {/* Timer Circle */}
             <div className={cn("relative mb-8", isCompact && "mb-4")}>
-                <svg className={cn(isCompact ? "h-48 w-48" : "h-64 w-64", "-rotate-90")} viewBox="0 0 256 256">
+                <svg
+                    className={cn(
+                        isCompact ? "h-48 w-48" : "h-64 w-64",
+                        "-rotate-90",
+                        isOvertime && timerExceededFlash && "animate-pulse"
+                    )}
+                    viewBox="0 0 256 256"
+                >
                     <circle cx="128" cy="128" r={radius} fill="none" stroke="currentColor" strokeWidth="6" className="text-zinc-800" />
-                    <circle cx="128" cy="128" r={radius} fill="none" stroke="currentColor" strokeWidth="6" strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={strokeDashoffset} className={cn("transition-all duration-300", isRunning ? "text-emerald-500" : "text-zinc-600")} />
+                    <circle
+                        cx="128" cy="128" r={radius}
+                        fill="none" stroke="currentColor" strokeWidth="6"
+                        strokeLinecap="round"
+                        strokeDasharray={circumference}
+                        strokeDashoffset={isOvertime ? 0 : strokeDashoffset}
+                        className={cn(
+                            "transition-all duration-300",
+                            isOvertime ? "text-red-500" : isRunning ? "text-emerald-500" : "text-zinc-600"
+                        )}
+                    />
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className={cn("font-mono font-bold tracking-tight text-white", isCompact ? "text-3xl" : "text-5xl")}>
-                        {formatTime(elapsedSeconds)}
+                    <span className={cn(
+                        "font-mono font-bold tracking-tight",
+                        isCompact ? "text-3xl" : "text-5xl",
+                        isOvertime ? "text-red-400" : "text-white"
+                    )}>
+                        {isOvertime ? `+${formatTime(overtimeSeconds)}` : formatTime(elapsedSeconds)}
                     </span>
                     {isRunning && (
-                        <span className="mt-1 text-[10px] text-zinc-500">
-                            of {durationMinutes}:00
+                        <span className={cn("mt-1 text-[10px]", isOvertime ? "text-red-400/60" : "text-zinc-500")}>
+                            {isOvertime ? 'overtime' : `of ${durationMinutes}:00`}
                         </span>
                     )}
                 </div>
@@ -214,7 +281,7 @@ export function ExecutionPanel({
                     onClick={() => setIsExpanded(!isExpanded)}
                     className="flex w-full items-center justify-between rounded-lg px-2 py-1 text-xs font-semibold uppercase tracking-wider text-zinc-500 hover:bg-zinc-800/50 transition-colors"
                 >
-                    <span>Block Details</span>
+                    <span>Future Blocks</span>
                     {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
                 </button>
 
