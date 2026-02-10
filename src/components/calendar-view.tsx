@@ -302,35 +302,47 @@ export function CalendarView({ blocks, viewMode, baseDate, onBlockUpdate, colorP
             }
         })
 
-        // 3. Return blocks with width/left styles
-        // We limit to max 3 visuals side-by-side unless expanded logic requires more
-        // But per requirements, "cascadae... max 3 items".
-        // Let's divide space by total columns needed for this group?
-        // Wait, "if > 4 items overlap" -> Error.
-
-        // Simple visualization:
-        // Width = 100% / total_columns_at_this_time
-        // This requires identifying concurrent groups.
-        // For simplicity: width = 100% / columns.length (uniform width for day)
-        // Or better: width = (100 - gap) / columns.length
-
-        // Actually, we need to know the max concurrency *overlapping this specific block*.
-
+        // 3. For each block, compute how many columns actually overlap with it
+        //    so non-overlapping blocks stay full-width.
         return layoutBlocks.map(block => {
-            const maxCols = columns.length
-            // Fallback width logic
-            const width = (100 - 2) / Math.min(maxCols, 3) // Cap visual width divisor at 3?
-            // Actually, if we have 4 columns, we show them thinned out or overlapping?
-            // Requirement: "if over 4 items... Alert". This happens on drag. Render we just render.
+            // Count columns that have at least one block overlapping this one
+            let concurrentCols = 0
+            for (const col of columns) {
+                const hasOverlap = col.some(other =>
+                    other !== block &&
+                    other.startMs < block.endMs &&
+                    other.endMs > block.startMs
+                )
+                if (hasOverlap || col.includes(block)) {
+                    concurrentCols++
+                }
+            }
 
-            // Adjust left based on colIndex
-            // If colIndex >= 3, maybe hide or stack? simpler to just render.
+            const maxCols = Math.max(concurrentCols, 1)
+
+            if (maxCols <= 1) {
+                // No overlaps — full width
+                return {
+                    ...block,
+                    style: {
+                        top: `${block.top}px`,
+                        height: `${block.height}px`,
+                        left: '0%',
+                        width: '100%',
+                        zIndex: block.colIndex! + 10
+                    }
+                }
+            }
+
+            // Overlapping — divide space (cap visual columns at 3)
+            const visCols = Math.min(maxCols, 3)
+            const width = (100 - 2) / visCols
             return {
                 ...block,
                 style: {
                     top: `${block.top}px`,
                     height: `${block.height}px`,
-                    left: `${(block.colIndex! * width)}%`,
+                    left: `${block.colIndex! * width}%`,
                     width: `${width}%`,
                     zIndex: block.colIndex! + 10
                 }
