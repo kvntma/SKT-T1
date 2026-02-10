@@ -25,6 +25,7 @@ export type Database = {
                     title: string
                     type: string | null
                     user_id: string
+                    is_quick_add: boolean | null
                 }
                 Insert: {
                     calendar_id?: string | null
@@ -41,6 +42,7 @@ export type Database = {
                     title: string
                     type?: string | null
                     user_id: string
+                    is_quick_add?: boolean | null
                 }
                 Update: {
                     calendar_id?: string | null
@@ -57,6 +59,7 @@ export type Database = {
                     title?: string
                     type?: string | null
                     user_id?: string
+                    is_quick_add?: boolean | null
                 }
                 Relationships: [
                     {

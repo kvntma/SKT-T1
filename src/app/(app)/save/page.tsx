@@ -5,7 +5,11 @@ import { useState, Suspense } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
+import { Input } from '@/components/ui/input'
 import { useSession } from '@/lib/hooks/useSession'
+import { createClient } from '@/lib/supabase/client'
+import { useQuery } from '@tanstack/react-query'
+import { Pencil } from 'lucide-react'
 import { useExecutionStore } from '@/lib/stores/execution-store'
 import {
     Select,
@@ -57,13 +61,55 @@ function SavePageContent() {
     const [abortReason, setAbortReason] = useState('')
     const [otherReason, setOtherReason] = useState('')
     const [isSaving, setIsSaving] = useState(false)
+
     const { endSession } = useSession()
     const { reset } = useExecutionStore()
+    const supabase = createClient()
+    const [editedTitle, setEditedTitle] = useState('')
+    const [isEditingTitle, setIsEditingTitle] = useState(false)
+
+    // Fetch session and block details
+    const { data: sessionData } = useQuery({
+        queryKey: ['session-details', sessionId],
+        queryFn: async () => {
+            if (!sessionId) return null
+            const { data, error } = await supabase
+                .from('sessions')
+                .select(`
+                    *,
+                    blocks (*)
+                `)
+                .eq('id', sessionId)
+                .single()
+
+            if (error) throw error
+            return data
+        },
+        enabled: !!sessionId
+    })
+
+    // Initialize title when data loads
+    if (sessionData?.blocks && !editedTitle && !isEditingTitle) {
+        // @ts-ignore - manual join type handling
+        setEditedTitle(sessionData.blocks.title)
+    }
 
     const handleSave = async () => {
         setIsSaving(true)
 
         try {
+            // Update block title if changed
+            if (sessionId && sessionData?.blocks && editedTitle &&
+                // @ts-ignore
+                editedTitle !== sessionData.blocks.title) {
+
+                await supabase
+                    .from('blocks')
+                    .update({ title: editedTitle })
+                    // @ts-ignore
+                    .eq('id', sessionData.blocks.id)
+            }
+
             if (sessionId && outcome) {
                 const finalAbortReason = abortReason === 'other' ? otherReason : abortReason
                 await endSession.mutateAsync({
@@ -114,6 +160,40 @@ function SavePageContent() {
                                 ? 'Great work! Save your progress.'
                                 : 'No worries. Capture what happened.'}
                         </p>
+
+                        {/* Editable Block Title */}
+                        {sessionData?.blocks && (
+                            <div className="mt-6 w-full">
+                                {isEditingTitle ? (
+                                    <div className="flex items-center gap-2">
+                                        <Input
+                                            value={editedTitle}
+                                            onChange={(e) => setEditedTitle(e.target.value)}
+                                            className="h-10 text-center text-lg font-medium bg-zinc-800 border-zinc-700"
+                                            autoFocus
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') setIsEditingTitle(false)
+                                            }}
+                                            onBlur={() => setIsEditingTitle(false)}
+                                        />
+                                    </div>
+                                ) : (
+                                    <div
+                                        onClick={() => setIsEditingTitle(true)}
+                                        className="group relative flex w-full cursor-pointer items-center justify-center rounded-lg border border-transparent bg-zinc-800/30 px-4 py-3 hover:border-zinc-700 hover:bg-zinc-800/50"
+                                    >
+                                        <span className="text-lg font-medium text-white">
+                                            {// @ts-ignore 
+                                                editedTitle || sessionData.blocks.title}
+                                        </span>
+                                        <Pencil className="absolute right-4 h-4 w-4 text-zinc-500 opacity-0 transition-opacity group-hover:opacity-100" />
+                                    </div>
+                                )}
+                                <p className="mt-2 text-xs text-zinc-500 text-center">
+                                    Tap to edit task name
+                                </p>
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
 

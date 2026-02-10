@@ -9,8 +9,10 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import type { Block } from '@/types'
+import { Pencil, Plus, Minus, Check, X } from 'lucide-react'
 
 function formatTime(seconds: number): string {
     const mins = Math.floor(seconds / 60)
@@ -51,6 +53,10 @@ export function NowView({ isCompact = false }: { isCompact?: boolean }) {
     const [undoCountdown, setUndoCountdown] = useState(5)
     const undoTimeoutRef = useRef<NodeJS.Timeout | null>(null)
     const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null)
+
+    // Quick Add Edit State
+    const [isEditingTitle, setIsEditingTitle] = useState(false)
+    const [editedTitle, setEditedTitle] = useState('')
 
     // The block to display - prefer override (from blocks page), fallback to current
     const activeBlock = overrideBlock || currentBlock
@@ -172,6 +178,7 @@ export function NowView({ isCompact = false }: { isCompact?: boolean }) {
                 type,
                 planned_start: now.toISOString(),
                 planned_end: end.toISOString(),
+                is_quick_add: true,
             })
 
             setOverrideBlock(newBlock as unknown as Block)
@@ -211,6 +218,56 @@ export function NowView({ isCompact = false }: { isCompact?: boolean }) {
             startTimer(session.id)
         } catch (error) {
             console.error('Failed to start early:', error)
+        }
+    }
+
+    const handleUpdateTitle = async () => {
+        if (!activeBlock || !editedTitle.trim()) return
+
+        try {
+            const updatedBlock = await updateBlock.mutateAsync({
+                id: activeBlock.id,
+                updates: { title: editedTitle }
+            })
+            setOverrideBlock(updatedBlock as unknown as Block)
+            setIsEditingTitle(false)
+        } catch (error) {
+            console.error('Failed to updating title:', error)
+        }
+    }
+
+    const handleAdjustDuration = async (minutes: number) => {
+        if (!activeBlock) return
+
+        const currentEnd = new Date(activeBlock.planned_end)
+        const newEnd = new Date(currentEnd.getTime() + minutes * 60000)
+        const now = new Date()
+
+        // Validation: End time cannot be in the past
+        if (newEnd <= now) return
+
+        // Validation: Cannot overlap with next block (if expanding)
+        if (minutes > 0) {
+            const nextBlock = blocks.find(b =>
+                new Date(b.planned_start) > new Date(activeBlock.planned_start) &&
+                b.id !== activeBlock.id
+            )
+
+            if (nextBlock && newEnd > new Date(nextBlock.planned_start)) {
+                // Clap to next block start?
+                // For now, just return
+                return
+            }
+        }
+
+        try {
+            const updatedBlock = await updateBlock.mutateAsync({
+                id: activeBlock.id,
+                updates: { planned_end: newEnd.toISOString() }
+            })
+            setOverrideBlock(updatedBlock as unknown as Block)
+        } catch (error) {
+            console.error('Failed to adjust duration:', error)
         }
     }
 
@@ -454,9 +511,53 @@ export function NowView({ isCompact = false }: { isCompact?: boolean }) {
                                 {getBlockTypeEmoji(activeBlock.type)}
                             </div>
                             <div className="min-w-0 flex-1">
-                                <h2 className="truncate text-base font-semibold text-white">
-                                    {activeBlock.title}
-                                </h2>
+                                {isEditingTitle ? (
+                                    <div className="flex items-center gap-2">
+                                        <Input
+                                            value={editedTitle}
+                                            onChange={(e) => setEditedTitle(e.target.value)}
+                                            className="h-8 text-base font-semibold bg-zinc-800 border-zinc-700"
+                                            autoFocus
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') handleUpdateTitle()
+                                                if (e.key === 'Escape') setIsEditingTitle(false)
+                                            }}
+                                        />
+                                        <Button
+                                            size="icon"
+                                            variant="ghost"
+                                            className="h-8 w-8 hover:bg-emerald-500/20 hover:text-emerald-400"
+                                            onClick={handleUpdateTitle}
+                                        >
+                                            <Check className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                            size="icon"
+                                            variant="ghost"
+                                            className="h-8 w-8 hover:bg-red-500/20 hover:text-red-400"
+                                            onClick={() => setIsEditingTitle(false)}
+                                        >
+                                            <X className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center gap-2 group/title">
+                                        <h2 className="truncate text-base font-semibold text-white">
+                                            {activeBlock.title}
+                                        </h2>
+                                        {activeBlock.is_quick_add && (
+                                            <button
+                                                onClick={() => {
+                                                    setEditedTitle(activeBlock.title)
+                                                    setIsEditingTitle(true)
+                                                }}
+                                                className="opacity-0 group-hover/title:opacity-100 transition-opacity text-zinc-500 hover:text-zinc-300"
+                                            >
+                                                <Pencil className="h-3 w-3" />
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
                                 <div className="mt-1 flex flex-wrap items-center gap-2">
                                     <Badge
                                         variant="outline"
@@ -464,8 +565,34 @@ export function NowView({ isCompact = false }: { isCompact?: boolean }) {
                                     >
                                         {activeBlock.type}
                                     </Badge>
-                                    <span className="text-xs text-zinc-500">
+                                    {activeBlock.is_quick_add && (
+                                        <Badge
+                                            variant="outline"
+                                            className="text-[10px] py-0 border-amber-500/20 bg-amber-500/10 text-amber-400"
+                                        >
+                                            Quick
+                                        </Badge>
+                                    )}
+                                    <span className="text-xs text-zinc-500 flex items-center gap-1">
                                         {blockDurationMinutes} min
+                                        {activeBlock.is_quick_add && (
+                                            <div className="ml-2 flex items-center gap-1">
+                                                <button
+                                                    onClick={() => handleAdjustDuration(-5)}
+                                                    className="p-0.5 hover:bg-zinc-800 rounded text-zinc-400 hover:text-zinc-200"
+                                                    title="-5 min"
+                                                >
+                                                    <Minus className="h-3 w-3" />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleAdjustDuration(5)}
+                                                    className="p-0.5 hover:bg-zinc-800 rounded text-zinc-400 hover:text-zinc-200"
+                                                    title="+5 min"
+                                                >
+                                                    <Plus className="h-3 w-3" />
+                                                </button>
+                                            </div>
+                                        )}
                                     </span>
                                 </div>
                             </div>

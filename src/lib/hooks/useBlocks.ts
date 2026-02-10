@@ -15,6 +15,7 @@ interface CreateBlockParams {
     routine_id?: string
     task_link?: string
     linear_issue_id?: string
+    is_quick_add?: boolean
 }
 
 interface UpdateBlockParams {
@@ -38,7 +39,7 @@ export function useBlocks(view: BlockView = 'today', baseDate: Date = new Date()
             const dayOfWeek = start.getDay()
             const weekStart = new Date(start)
             weekStart.setDate(start.getDate() - dayOfWeek)
-            
+
             const end = new Date(weekStart)
             end.setDate(end.getDate() + 7)
             return { start: weekStart, end }
