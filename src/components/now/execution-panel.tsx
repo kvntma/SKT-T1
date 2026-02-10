@@ -1,12 +1,13 @@
 'use client'
 
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import type { Block } from '@/types'
-import { Pencil, Plus, Minus, Check, X } from 'lucide-react'
+import { Pencil, Plus, Minus, Check, X, ChevronDown, ChevronRight, ExternalLink } from 'lucide-react'
 import { formatTime, getBlockTypeEmoji, getBlockTypeColor } from './utils'
 
 interface ExecutionPanelProps {
@@ -20,6 +21,14 @@ interface ExecutionPanelProps {
     editedTitle: string
     stopCondition?: string | null
     resumeToken?: string | null
+    blocks?: Array<{
+        id: string
+        title: string
+        type: string | null
+        planned_start: string
+        planned_end: string
+        [key: string]: unknown
+    }>
     // Handlers
     onStart: () => void
     onStop: () => void
@@ -44,6 +53,7 @@ export function ExecutionPanel({
     editedTitle,
     stopCondition,
     resumeToken,
+    blocks = [],
     onStart,
     onStop,
     onDone,
@@ -55,6 +65,8 @@ export function ExecutionPanel({
     onStartEditing,
     onCancelEditing,
 }: ExecutionPanelProps) {
+    const [isExpanded, setIsExpanded] = useState(false)
+
     // Timer Visuals
     const radius = 120
     const circumference = 2 * Math.PI * radius
@@ -62,6 +74,11 @@ export function ExecutionPanel({
     const progress = Math.min(Math.max(elapsedSeconds / totalDuration, 0), 1)
     const strokeDashoffset = circumference - progress * circumference
     const durationMinutes = Math.round((new Date(activeBlock.planned_end).getTime() - new Date(activeBlock.planned_start).getTime()) / 60000)
+
+    const upcomingBlocks = blocks
+        .filter(b => new Date(b.planned_start) > new Date() && b.id !== activeBlock.id)
+        .sort((a, b) => new Date(a.planned_start).getTime() - new Date(b.planned_start).getTime())
+        .slice(0, 3)
 
     return (
         <div className={cn("relative z-10 flex w-full flex-col items-center", isCompact ? "" : "max-w-sm")}>
@@ -191,32 +208,95 @@ export function ExecutionPanel({
                 )}
             </div>
 
-            {/* Info Card (Stop Condition or Last Action) */}
-            {(stopCondition || (resumeToken && !isRunning)) && (
-                <Card className={cn("mt-4 w-full border-zinc-800 bg-zinc-900/50", isCompact && "mt-3")}>
-                    <CardContent className="p-3">
-                        {stopCondition ? (
-                            <>
-                                <p className="text-[10px] font-medium uppercase tracking-wider text-zinc-500">
-                                    Stop Condition
+            {/* Collapsible Details */}
+            <div className="mt-6 w-full space-y-2">
+                <button
+                    onClick={() => setIsExpanded(!isExpanded)}
+                    className="flex w-full items-center justify-between rounded-lg px-2 py-1 text-xs font-semibold uppercase tracking-wider text-zinc-500 hover:bg-zinc-800/50 transition-colors"
+                >
+                    <span>Block Details</span>
+                    {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                </button>
+
+                {isExpanded && (
+                    <div className="space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
+                        {/* Info Card (Stop Condition or Last Action) */}
+                        {(stopCondition || (resumeToken && !isRunning)) && (
+                            <Card className="w-full border-zinc-800 bg-zinc-900/50">
+                                <CardContent className="p-3">
+                                    {stopCondition ? (
+                                        <>
+                                            <p className="text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+                                                Stop Condition
+                                            </p>
+                                            <p className="mt-0.5 text-xs text-zinc-300">
+                                                {stopCondition}
+                                            </p>
+                                        </>
+                                    ) : resumeToken && !isRunning ? (
+                                        <>
+                                            <p className="text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+                                                Last Action
+                                            </p>
+                                            <p className="mt-0.5 text-xs text-zinc-300">
+                                                {resumeToken}
+                                            </p>
+                                        </>
+                                    ) : null}
+                                </CardContent>
+                            </Card>
+                        )}
+
+                        {/* Quick Links */}
+                        {(activeBlock.linear_issue_id || activeBlock.task_link) && (
+                            <div className="flex flex-wrap gap-2 px-1">
+                                {activeBlock.linear_issue_id && (
+                                    <a
+                                        href={`https://linear.app/issue/${activeBlock.linear_issue_id}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-1 rounded-md bg-indigo-500/10 px-2 py-1 text-[10px] font-medium text-indigo-400 ring-1 ring-indigo-500/20 hover:bg-indigo-500/20"
+                                    >
+                                        📐 {activeBlock.linear_issue_id}
+                                        <ExternalLink className="h-2 w-2" />
+                                    </a>
+                                )}
+                                {activeBlock.task_link && (
+                                    <a
+                                        href={activeBlock.task_link}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-1 rounded-md bg-purple-500/10 px-2 py-1 text-[10px] font-medium text-purple-400 ring-1 ring-purple-500/20 hover:bg-purple-500/20"
+                                    >
+                                        🔗 Link
+                                        <ExternalLink className="h-2 w-2" />
+                                    </a>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Next Up */}
+                        {upcomingBlocks.length > 0 && (
+                            <div className="space-y-1.5 px-1">
+                                <p className="text-[10px] font-medium uppercase tracking-wider text-zinc-600">
+                                    Next Up
                                 </p>
-                                <p className="mt-0.5 text-xs text-zinc-300">
-                                    {stopCondition}
-                                </p>
-                            </>
-                        ) : resumeToken && !isRunning ? (
-                            <>
-                                <p className="text-[10px] font-medium uppercase tracking-wider text-zinc-500">
-                                    Last Action
-                                </p>
-                                <p className="mt-0.5 text-xs text-zinc-300">
-                                    {resumeToken}
-                                </p>
-                            </>
-                        ) : null}
-                    </CardContent>
-                </Card>
-            )}
+                                {upcomingBlocks.map(block => (
+                                    <div key={block.id} className="flex items-center gap-2 rounded-md bg-zinc-900/50 p-2 border border-zinc-800/50">
+                                        <span className="text-xs">{getBlockTypeEmoji(block.type || 'focus')}</span>
+                                        <div className="min-w-0 flex-1">
+                                            <p className="truncate text-[11px] font-medium text-zinc-300">{block.title}</p>
+                                            <p className="text-[9px] text-zinc-500">
+                                                {new Date(block.planned_start).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                                            </p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
 
             {/* Undo Stop Toast */}
             {pendingStop && (

@@ -518,7 +518,12 @@ export default function BlocksPage() {
                                                 <p className={cn("truncate font-medium", (status.status === 'done' || status.status === 'skipped') ? "text-zinc-400" : "text-white")}>{block.title}</p>
                                                 <div className="mt-1 flex flex-wrap items-center gap-2">
                                                     <Badge variant="outline" className={cn("text-xs", getBlockTypeColor(block.type))}>{config.label}</Badge>
-                                                    <span className="text-xs text-zinc-500">{formatTime(block.planned_start)} - {formatTime(block.planned_end)}</span>
+                                                    <span className="text-xs text-zinc-500">
+                                                        {!isSameDay(new Date(block.planned_start), currentTime) && (
+                                                            <>{formatDate(block.planned_start)} · </>
+                                                        )}
+                                                        {formatTime(block.planned_start)} - {formatTime(block.planned_end)}
+                                                    </span>
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-1">

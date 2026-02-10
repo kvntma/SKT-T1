@@ -374,6 +374,7 @@ export function NowView({ isCompact = false }: { isCompact?: boolean }) {
                     editedTitle={editedTitle}
                     stopCondition={activeBlock.stop_condition}
                     resumeToken={lastSession?.resume_token}
+                    blocks={blocks}
                     onStart={handleStart}
                     onStop={handleStop}
                     onDone={handleDone}
