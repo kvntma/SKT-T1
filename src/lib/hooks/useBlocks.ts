@@ -22,7 +22,7 @@ interface UpdateBlockParams {
     updates: Partial<CreateBlockParams>
 }
 
-type BlockView = 'today' | 'week'
+type BlockView = 'today' | '3day' | 'week'
 
 export function useBlocks(view: BlockView = 'today', baseDate: Date = new Date()) {
     const supabase = createClient()
@@ -36,10 +36,17 @@ export function useBlocks(view: BlockView = 'today', baseDate: Date = new Date()
         if (view === 'week') {
             // Align to Sunday for consistent week display
             const dayOfWeek = start.getDay()
-            start.setDate(start.getDate() - dayOfWeek)
+            const weekStart = new Date(start)
+            weekStart.setDate(start.getDate() - dayOfWeek)
             
-            const end = new Date(start)
+            const end = new Date(weekStart)
             end.setDate(end.getDate() + 7)
+            return { start: weekStart, end }
+        }
+
+        if (view === '3day') {
+            const end = new Date(start)
+            end.setDate(end.getDate() + 3)
             return { start, end }
         }
 
