@@ -132,7 +132,7 @@ export default function BlocksPage() {
         d.setHours(0, 0, 0, 0)
         return d
     })
-    const { blocks, isLoading, createBlock, updateBlock, deleteBlock } = useBlocks(viewMode === 'week' ? 'week' : 'today', selectedDate)
+    const { blocks, isLoading, createBlock, updateBlock, deleteBlock } = useBlocks(viewMode === 'day' ? 'today' : viewMode, selectedDate)
 
     const [isRefactoring, setIsRefactoring] = useState(false)
     const [refactorProposal, setRefactorProposal] = useState<DisplayBlock[] | null>(null)
