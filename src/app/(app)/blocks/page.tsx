@@ -236,7 +236,7 @@ export default function BlocksPage() {
         }
     }, [selectedDate, viewMode])
 
-    const handleBlockUpdate = async (id: string, updates: { planned_start: string; planned_end: string }) => {
+    const handleBlockUpdate = async (id: string, updates: { title?: string; planned_start?: string; planned_end?: string }) => {
         try {
             await updateBlock.mutateAsync({ id, updates })
         } catch (error) {
@@ -458,12 +458,12 @@ export default function BlocksPage() {
                             </Button>
                         </div>
                         <span className="text-sm font-semibold text-white">{formattedSelectedDate}</span>
-                                            <div className="flex gap-1 rounded-lg bg-zinc-800 p-1">
-                                                <button onClick={() => setViewMode('day')} className={cn("px-3 py-1 text-xs font-medium rounded-md transition-colors", viewMode === 'day' ? "bg-zinc-700 text-white" : "text-zinc-400 hover:text-white")}>Day</button>
-                                                <button onClick={() => setViewMode('3day')} className={cn("px-3 py-1 text-xs font-medium rounded-md transition-colors", viewMode === '3day' ? "bg-zinc-700 text-white" : "text-zinc-400 hover:text-white")}>3-Day</button>
-                                                <button onClick={() => setViewMode('week')} className={cn("px-3 py-1 text-xs font-medium rounded-md transition-colors", viewMode === 'week' ? "bg-zinc-700 text-white" : "text-zinc-400 hover:text-white")}>Week</button>
-                                            </div>
-                        
+                        <div className="flex gap-1 rounded-lg bg-zinc-800 p-1">
+                            <button onClick={() => setViewMode('day')} className={cn("px-3 py-1 text-xs font-medium rounded-md transition-colors", viewMode === 'day' ? "bg-zinc-700 text-white" : "text-zinc-400 hover:text-white")}>Day</button>
+                            <button onClick={() => setViewMode('3day')} className={cn("px-3 py-1 text-xs font-medium rounded-md transition-colors", viewMode === '3day' ? "bg-zinc-700 text-white" : "text-zinc-400 hover:text-white")}>3-Day</button>
+                            <button onClick={() => setViewMode('week')} className={cn("px-3 py-1 text-xs font-medium rounded-md transition-colors", viewMode === 'week' ? "bg-zinc-700 text-white" : "text-zinc-400 hover:text-white")}>Week</button>
+                        </div>
+
                     </div>
 
                     {showCreate && (
@@ -499,7 +499,7 @@ export default function BlocksPage() {
                         ) : allBlocks.length === 0 ? (
                             <Card className="border-zinc-800 bg-zinc-900/50"><CardContent className="flex flex-col items-center py-12 text-center"><span className="text-4xl mb-4">📅</span><p className="text-zinc-400">No blocks scheduled for this period</p></CardContent></Card>
                         ) : displayMode === 'calendar' ? (
-                            <CalendarView blocks={allBlocks} viewMode={viewMode} baseDate={selectedDate} colorPrefs={colorPrefs} calendars={allCalendars} onBlockClick={(id) => router.push(`/blocks/${id}`)} onBlockUpdate={handleBlockUpdate} />
+                            <CalendarView blocks={allBlocks} viewMode={viewMode} baseDate={selectedDate} colorPrefs={colorPrefs} calendars={allCalendars} onBlockUpdate={handleBlockUpdate} />
                         ) : (
                             allBlocks.map((block) => {
                                 const status = getBlockStatus(block, block.session, currentTime)

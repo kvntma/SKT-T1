@@ -1,22 +1,18 @@
 # Current Work Memory
-Last updated: 2026-02-09 22:18 local
+Last updated: 2026-02-09 22:35 local
 
-Ticket: SKT-31
-Branch: kvntma/skt-31-allow-editing-task-name-on-completion-and-quickadd-ui
+Ticket: SKT-33 (Allow blocks in PTS to be moved across days)
+Branch: kvntma/skt-33-allow-blocks-in-pts-to-be-moved-across-days-in-calendar-view
 
 ## Summary
-- **Started SKT-31**: Allow Editing Task Name on Completion and QuickAdd UI Enhancements.
-- **Goal**:
-    - Allow renaming tasks upon completion.
-    - Track "quickAdd" tasks in the DB.
-    - specialized UI for quickAdd tasks in `/now` (name/time editing).
-
-## Decisions (Do Not Re-litigate)
-- **Session-Aware Current Block:** The `useCurrentBlock` hook now considers session state.
-- **Flex-based Centering:** `AppLayout` uses flex for vertical centering.
+- **Fixed SKT-28**: Resolved issue where short calendar blocks were illegible.
+- **Changes**:
+    - Increased minimum block height to 26px in `CalendarView`.
+    - Added responsive styling in `DraggableBlock` based on height.
+    - Reduced padding (down to `p-0.5`) for short blocks.
+    - Hid time string for blocks under 40px height.
+    - Vertically centered content in short blocks.
 
 ## Next Steps
-- [ ] Database: Check `blocks` table for "quickAdd" flag support.
-- [ ] Backend: Update `completeBlock` server action to support renaming.
-- [ ] UI: Add "Edit Name" input to the Completion/Save flow.
-- [ ] UI: Add inline edit controls for QuickAdd blocks on `/now` page.
+- [ ] User to verify fix in the calendar view with 15-minute blocks.
+- [ ] Resume work on SKT-31 (Allow Editing Task Name on Completion).

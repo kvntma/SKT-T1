@@ -8,28 +8,33 @@ In the calendar view, blocks with a short duration (e.g., < 30 mins) become vert
 ### 1. Increase Minimum Height
 Currently, `getBlockStyle` has a `min-height` of `20px`:
 ```typescript
-const height = Math.max((endHour - startHour) * HOUR_HEIGHT, 20)
+const height = Math.max((endHour - startHour) * HOUR_HEIGHT, 26) // Increased to 26
 ```
-**Recommendation:** Increase this to `24px` or `28px` to ensure at least one line of text and icons are always visible.
 
 ### 2. Condensed Layout for Short Blocks
 In `DraggableBlock`, implement more aggressive compacting based on duration:
 - **Duration < 30m:** Hide the time string, show only Icon + Title in a single line.
-- **Duration < 20m:** Hide the Title text by default, show only the Icon. Show the full title on hover via a simple tooltip or by expanding the block's z-index and height temporarily.
+- **Duration < 20m:** Hide the Title text by default, show only the Icon. (Actually kept title but used text-10px and p-0.5)
 
 ### 3. Padding Adjustment
 Reduce internal padding for small blocks to reclaim vertical pixels.
 ```typescript
 className={cn(
-    "absolute rounded-lg p-1 text-left ...", // Changed from p-1.5
-    height < 30 && "p-0.5"
+    "absolute rounded-lg p-1.5 text-left ...",
+    isSmallHeight && "p-1",
+    height < 28 && "p-0.5"
 )}
 ```
 
 ### 4. Implementation Details
-Update `DraggableBlock` to receive the calculated `height` or `duration` as a prop to make styling decisions easier.
+Update `DraggableBlock` to handle small height logic internally by parsing `style.height`.
 
 ## Progress
 - [x] Create bug ticket in Linear.
 - [x] Initial investigation of code.
-- [ ] Implement fix.
+- [x] Implement fix in `src/components/calendar-view.tsx`.
+    - Increased min-height to 26px.
+    - Added `isSmallHeight` and `isCompact` logic based on height.
+    - Reduced padding for small blocks.
+    - Vertically centered content with `justify-center`.
+    - Hid time string for height < 40px.
