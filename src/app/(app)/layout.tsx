@@ -18,8 +18,8 @@ export default async function AppLayout({
     return (
         <div className="min-h-screen bg-zinc-950 text-white flex">
             <SidebarNav />
-            <main className="flex-1 md:pl-64">
-                <div className="pb-20 md:pb-0">
+            <main className="flex-1 md:pl-64 flex flex-col min-h-screen">
+                <div className="flex-1 flex flex-col pb-20 md:pb-0">
                     {children}
                 </div>
                 <div className="md:hidden">

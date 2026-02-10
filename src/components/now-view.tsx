@@ -173,7 +173,7 @@ export function NowView({ isCompact = false }: { isCompact?: boolean }) {
 
     if (!activeBlock) {
         return (
-            <div className="flex h-full flex-col items-center justify-center px-6 text-center">
+            <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
                 <div className="relative z-10 flex flex-col items-center">
                     <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-zinc-900 text-3xl shadow-xl ring-1 ring-zinc-800">
                         ⏸️
@@ -278,7 +278,7 @@ export function NowView({ isCompact = false }: { isCompact?: boolean }) {
     const strokeDashoffset = circumference - (progress / 100) * circumference
 
     return (
-        <div className={cn("relative flex flex-col items-center justify-center px-4", isCompact ? "py-4" : "min-h-screen")}>
+        <div className={cn("relative flex flex-col items-center justify-center px-4", isCompact ? "py-4" : "flex-1")}>
             <div className={cn("relative z-10 flex w-full flex-col items-center", isCompact ? "" : "max-w-sm")}>
                 {/* Block Card */}
                 <Card className={cn("mb-6 w-full border-zinc-800 bg-zinc-900/80 backdrop-blur-xl", isCompact && "mb-4")}>

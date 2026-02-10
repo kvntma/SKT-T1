@@ -1,23 +1,20 @@
 # Current Work Memory
-Last updated: 2026-02-09 10:45 local
+Last updated: 2026-02-10 11:35 local
 
-Ticket: SKT-27
+Ticket: SKT-29
 Branch: master
 
 ## Summary
-- Completed SKT-27: Calendar Refactor.
-- Unified `CalendarView` to support any number of days (1, 3, or 7) based on `viewMode`.
-- Implemented **3-Day view** as a new middle-ground option.
-- Added **vertical scrolling** with full 24-hour time axis support.
-- Implemented **auto-scroll** to the current time on component mount.
-- Improved the **Red Line** time indicator to only show on the current day's column.
-- Made the **Calendar** the default display mode for the `/blocks` page.
-- Verified build: ✅ Success.
+- Completed SKT-29: Bug: Center Active Block in Desktop View.
+- Refactored `AppLayout` to use a flex-based system that allows children to fill the visible height.
+- Fixed `NowView` and `SavePage` to use `flex-1` for proper vertical centering on both desktop and mobile.
+- Corrected the "No active block" state which was improperly positioned at the top of the page.
+- Verified that `isCompact` mode in `BlocksPage` remains unaffected.
 
 ## Decisions (Do Not Re-litigate)
-- **Single Grid System:** Abandoned separate mobile/desktop layouts for the calendar in favor of a flexible, responsive CSS grid that scales column widths.
-- **24-Hour View:** Switched from a limited (6 AM - 11 PM) view to a full 24-hour view to ensure visibility of all potential blocks.
+- **Flex-based Centering:** Moved away from fixed `min-h-screen` on individual pages in favor of a flexible `flex-1` approach within the `AppLayout` flex container. This is more robust for centering relative to viewport changes (sidebar, bottom nav).
 
 ## Next Steps
 - [ ] Implement retrospective session creation for "Missed" blocks (SKT-21).
 - [ ] Implement auto-transition of Linear issue status on session completion (SKT-22).
+- [ ] Investigate SKT-19 Undo Toast implementation.

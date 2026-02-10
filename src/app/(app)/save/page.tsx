@@ -87,7 +87,7 @@ function SavePageContent() {
     const isValid = outcome === 'done' || (outcome === 'aborted' && abortReason && (abortReason !== 'other' || otherReason.trim()))
 
     return (
-        <div className="relative flex min-h-screen flex-col items-center justify-center px-6">
+        <div className="relative flex flex-1 flex-col items-center justify-center px-6 py-12">
             {/* Ambient glow */}
             <div className="pointer-events-none absolute inset-0 overflow-hidden">
                 <div
