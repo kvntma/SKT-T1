@@ -1,5 +1,5 @@
 # Current Truth Memory
-Last updated: 2026-03-28 (Saturday)
+Last updated: 2026-03-30 (Sunday)
 
 ## Key Decisions (The Obsidian Pivot)
 - **Source of Truth:** The **Obsidian Vault** is the database. Next.js reads/writes to markdown files directly.
@@ -22,11 +22,14 @@ Last updated: 2026-03-28 (Saturday)
 - [x] Integrate detailed `Journal.md` template support (YAML metadata + structured sections).
 - [x] Implement "Vault Audit" and "Batch Linker" cleanup tools.
 - [x] Fix React Input component console warnings.
+- [x] Successfully integrated Vercel AI SDK (Anthropic) with Obsidian tools and multi-step agent workflow.
+- [x] Documented AI SDK debugging journey (`docs/ai-sdk-debugging-journey.md`).
 
 ## Gotchas / Known Risks
 - **WSL Access:** Ensure Windows drive remains mounted at `/mnt/c/`.
 - **Date Formatting:** `date-fns` needs `'J'-` escaping for Obsidian prefix.
 - **Plugin Dependencies:** `getNearbyNotes` relies on the Smart Connections plugin's local `.ajson` files.
+- **Vercel AI SDK v6.x Nuances:** Requires specific `ToolLoopAgent` and `createAgentUIStreamResponse` patterns for multi-step workflows.
 
 ## Next Steps
 - [ ] Run the first **Vault Audit** to map current chaos.
@@ -39,3 +42,4 @@ Last updated: 2026-03-28 (Saturday)
 - `src/app/api/chat/route.ts` (Planning Brain)
 - `src/app/(app)/review/page.tsx` (Review UI)
 - `src/app/(app)/now/page.tsx` (Now View)
+- `docs/ai-sdk-debugging-journey.md` (AI SDK Debugging Documentation)
