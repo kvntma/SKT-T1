@@ -64,3 +64,11 @@ export interface ExecutionState {
     currentSessionId?: string
     elapsedSeconds: number
 }
+
+// Obsidian Integration Types
+export interface ObsidianTask {
+    id: string;
+    text: string;
+    completed: boolean;
+    lineIndex: number;
+}

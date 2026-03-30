@@ -139,6 +139,17 @@ export function useCalendar() {
 
             setSyncedCalendarIds(newIds)
             await saveSyncedCalendars(newIds)
+
+            // Trigger sync with force=true to bypass cache since selection changed
+            const res = await fetch('/api/calendar/sync?force=true', { method: 'POST' })
+            if (!res.ok) {
+                if (res.status === 401) {
+                    throw new Error('Unauthorized')
+                }
+                const errorData = await res.json().catch(() => ({}))
+                throw new Error(`${errorData.error || 'Sync failed'}${errorData.details ? `: ${errorData.details}` : ''}`)
+            }
+
             return newIds
         },
         onSuccess: (newIds) => {
@@ -148,6 +159,17 @@ export function useCalendar() {
         },
         onError: (error) => {
             console.error('[useCalendar] Toggle failed:', error)
+            if (error instanceof Error) {
+                if (error.message === 'Unauthorized') {
+                    if (confirm('Connection expired. Reconnect Google Calendar now?')) {
+                        window.location.href = '/api/calendar?action=connect'
+                    }
+                } else {
+                    alert(`Failed to sync: ${error.message}`)
+                }
+            } else {
+                alert('Failed to sync. Please try again.')
+            }
         },
     })
 

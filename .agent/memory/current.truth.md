@@ -1,26 +1,41 @@
 # Current Truth Memory
-Last updated: 2026-02-08 21:15 local
+Last updated: 2026-03-28 (Saturday)
 
-## Key Decisions
-- **Vision:** "Push To Start" is a dynamic execution layer.
-- **Routines:** Non-negotiable recurring templates that auto-populate the daily schedule and act as fixed anchors for the AI Refactor engine.
-- **Workflow:** Standardized on "Ralph Workflow" (.agent/memory/ persistence is mandatory).
-- **Navigation:** `/blocks` page supports full temporal navigation (Day/Week view) with state-driven data fetching.
-- **Stability:** Use bulk DB operations (`upsert`) and `.maybeSingle()` to maintain clean logs.
+## Key Decisions (The Obsidian Pivot)
+- **Source of Truth:** The **Obsidian Vault** is the database. Next.js reads/writes to markdown files directly.
+- **Architecture:** Local-First, hosted on WSL, accessible via custom domain (Cloudflare Tunnels).
+- **AI Brain:** Claude 3.5 Sonnet (Anthropic) for planning and review.
+- **Workflow:** Daily Notes (`Zettelkasten/Journal/J-yyyy-MM-dd.md`) are the task source.
+- **Removed:** Supabase, Google Calendar Sync, and standard User Auth (Local-only).
 
 ## Architecture
-- **Dynamic Scheduling:** Managed via `@dnd-kit` (Frontend) and `/api/blocks/refactor` (AI Backend).
-- **Routines:** Templates live in `routines` table; blocks link via `routine_id`.
-- **Auto-Sync:** Triggered via `RoutineSyncProvider` on app load.
+- **API:** Vercel AI SDK + Anthropic for conversational planning.
+- **Tools:** AI can `readDailyNote`, `createDailyNote`, `updateTaskStatus`, `addTaskToNote`, `moveTaskToTomorrow`, `searchVault`, `updateFrontmatter`, `writeNote`, `appendToNote`, `listAllNotes`, `getNearbyNotes` (Smart Connections), `runVaultAudit`, and `batchLinkFolder`.
+- **Frontend:** `/now` (Execution), `/review` (Planning), `/stats` (Visual Feedback), `/blocks` (Historical view).
 
-## Progress (Phase 6)
-- [x] Draggable vertical time-grid
-- [x] AI Schedule Refactor (Proposal flow)
-- [x] Recurring Routines & Non-negotiables (SKT-16)
-- [x] Bulk Sync/Push optimizations
+## Progress (The Pivot)
+- [x] Uninstall Supabase & Auth dependencies.
+- [x] Link WSL to Windows Obsidian Vault.
+- [x] Build AI Review chat interface with "Knowledge Architect" persona.
+- [x] Implement comprehensive Obsidian FS utilities (`src/lib/obsidian.ts`).
+- [x] Integrate Smart Connections bridge for pre-calculated semantic data.
+- [x] Integrate detailed `Journal.md` template support (YAML metadata + structured sections).
+- [x] Implement "Vault Audit" and "Batch Linker" cleanup tools.
+- [x] Fix React Input component console warnings.
+
+## Gotchas / Known Risks
+- **WSL Access:** Ensure Windows drive remains mounted at `/mnt/c/`.
+- **Date Formatting:** `date-fns` needs `'J'-` escaping for Obsidian prefix.
+- **Plugin Dependencies:** `getNearbyNotes` relies on the Smart Connections plugin's local `.ajson` files.
+
+## Next Steps
+- [ ] Run the first **Vault Audit** to map current chaos.
+- [ ] Implement the `/stats` visual dashboard using metadata extracted from journal notes.
+- [ ] Complete the `/now` loop refactor (Mark Done write-back, session duration logging).
+- [ ] Establish the Macro/Meso/Micro hierarchy through automated synthesis.
 
 ## Key Files
-- `src/lib/hooks/useRoutineSync.ts` (Auto-population)
-- `src/app/api/blocks/refactor/route.ts` (Refactor Engine)
-- `src/app/(app)/settings/page.tsx` (Routine Management)
-- `pushtostart.md` (Source of Truth PRD)
+- `src/lib/obsidian.ts` (Vault Utility)
+- `src/app/api/chat/route.ts` (Planning Brain)
+- `src/app/(app)/review/page.tsx` (Review UI)
+- `src/app/(app)/now/page.tsx` (Now View)

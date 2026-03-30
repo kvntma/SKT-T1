@@ -1,56 +1,14 @@
 'use client'
 
 import { useSearchParams, useRouter } from 'next/navigation'
-import { useState, Suspense, useEffect } from 'react'
+import { useState, Suspense } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
-import { useSession } from '@/lib/hooks/useSession'
-import { createClient } from '@/lib/supabase/client'
-import { useQuery } from '@tanstack/react-query'
-import { Pencil } from 'lucide-react'
+import { Pencil, CheckCircle2, XCircle } from 'lucide-react'
 import { useExecutionStore } from '@/lib/stores/execution-store'
-import {
-    Select,
-    SelectContent,
-    SelectGroup,
-    SelectItem,
-    SelectLabel,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select'
 import { cn } from '@/lib/utils'
-// Categorized by root cause for LLM pattern analysis
-const ABORT_REASONS = [
-    // Attention/Focus issues
-    { value: 'mind_wandering', label: 'Mind wandering', emoji: '💭', category: 'focus' },
-    { value: 'phone_rabbit_hole', label: 'Phone/internet rabbit hole', emoji: '📱', category: 'focus' },
-    { value: 'external_interruption', label: 'Someone interrupted me', emoji: '🗣️', category: 'focus' },
-
-    // Blockers
-    { value: 'unclear_next_step', label: 'Unclear what to do next', emoji: '🤔', category: 'blocked' },
-    { value: 'technical_blocker', label: 'Technical issue/bug', emoji: '🐛', category: 'blocked' },
-    { value: 'waiting_on_someone', label: 'Waiting on someone else', emoji: '⏳', category: 'blocked' },
-    { value: 'missing_info', label: 'Need more information', emoji: '📋', category: 'blocked' },
-
-    // Energy/Capacity
-    { value: 'mental_fatigue', label: 'Mental fatigue', emoji: '🧠', category: 'energy' },
-    { value: 'physical_fatigue', label: 'Physical fatigue', emoji: '😴', category: 'energy' },
-    { value: 'hunger_thirst', label: 'Hungry/thirsty', emoji: '🍽️', category: 'energy' },
-    { value: 'need_break', label: 'Need a break', emoji: '☕', category: 'energy' },
-
-    // Task scoping
-    { value: 'task_too_big', label: 'Task too big/vague', emoji: '🏔️', category: 'scoping' },
-    { value: 'wrong_task', label: 'Working on wrong thing', emoji: '🔄', category: 'scoping' },
-
-    // External
-    { value: 'urgent_interrupt', label: 'Urgent priority came up', emoji: '🚨', category: 'external' },
-    { value: 'meeting_call', label: 'Meeting/call', emoji: '📞', category: 'external' },
-
-    // Catch-all
-    { value: 'other', label: 'Other (describe below)', emoji: '✏️', category: 'other' },
-]
 
 function SavePageContent() {
     const searchParams = useSearchParams()
@@ -58,67 +16,30 @@ function SavePageContent() {
     const outcome = searchParams.get('outcome') as 'done' | 'aborted' | null
     const sessionId = searchParams.get('sessionId')
     const [resumeToken, setResumeToken] = useState('')
-    const [abortReason, setAbortReason] = useState('')
-    const [otherReason, setOtherReason] = useState('')
     const [isSaving, setIsSaving] = useState(false)
-
-    const { endSession } = useSession()
     const { reset } = useExecutionStore()
-    const supabase = createClient()
-    const [editedTitle, setEditedTitle] = useState('')
     const [isEditingTitle, setIsEditingTitle] = useState(false)
-
-    // Fetch session and block details
-    const { data: sessionData } = useQuery({
-        queryKey: ['session-details', sessionId],
-        queryFn: async () => {
-            if (!sessionId) return null
-            const { data, error } = await supabase
-                .from('sessions')
-                .select(`
-                    *,
-                    blocks (*)
-                `)
-                .eq('id', sessionId)
-                .single()
-
-            if (error) throw error
-            return data
-        },
-        enabled: !!sessionId
-    })
-
-    // Initialize title when data loads
-    useEffect(() => {
-        if (sessionData?.blocks && !editedTitle && !isEditingTitle) {
-            const title = sessionData.blocks.title as string
-            setEditedTitle(title)
-        }
-    }, [sessionData, editedTitle, isEditingTitle])
+    
+    // TODO: Wire up useObsidianTask hook to fetch title
+    const [editedTitle, setEditedTitle] = useState('Current Task Title')
 
     const handleSave = async () => {
         setIsSaving(true)
 
         try {
-            // Update block title if changed
-            if (sessionId && sessionData?.blocks && editedTitle &&
-                editedTitle !== sessionData.blocks.title) {
+            // TODO: Wire up obsidian write-back utility
+            // 1. Mark task as [x] in markdown
+            // 2. Append resume token as sub-bullet
+            // 3. Log session duration
+            
+            console.log('Saving to Obsidian:', {
+                title: editedTitle,
+                outcome,
+                resumeToken
+            })
 
-                await supabase
-                    .from('blocks')
-                    .update({ title: editedTitle })
-                    .eq('id', sessionData.blocks.id)
-            }
-
-            if (sessionId && outcome) {
-                const finalAbortReason = abortReason === 'other' ? otherReason : abortReason
-                await endSession.mutateAsync({
-                    sessionId,
-                    outcome,
-                    abortReason: outcome === 'aborted' ? finalAbortReason : undefined,
-                    resumeToken: resumeToken || undefined,
-                })
-            }
+            // Simulate delay
+            await new Promise(resolve => setTimeout(resolve, 500))
 
             // Reset the timer state
             reset()
@@ -129,8 +50,6 @@ function SavePageContent() {
             setIsSaving(false)
         }
     }
-
-    const isValid = outcome === 'done' || (outcome === 'aborted' && abortReason && (abortReason !== 'other' || otherReason.trim()))
 
     return (
         <div className="relative flex flex-1 flex-col items-center justify-center px-6 py-12">
@@ -150,224 +69,83 @@ function SavePageContent() {
                             ? 'bg-emerald-500/10 ring-1 ring-emerald-500/20'
                             : 'bg-amber-500/10 ring-1 ring-amber-500/20'
                             }`}>
-                            {outcome === 'done' ? '✅' : '⏹️'}
+                            {outcome === 'done' ? <CheckCircle2 className="h-10 w-10 text-emerald-500" /> : <XCircle className="h-10 w-10 text-amber-500" />}
                         </div>
                         <h1 className="text-2xl font-bold text-white">
-                            {outcome === 'done' ? 'Block Completed' : 'Block Stopped'}
+                            {outcome === 'done' ? 'Task Completed' : 'Task Stopped'}
                         </h1>
-                        <p className="mt-1 text-sm text-zinc-500">
+                        <p className="mt-1 text-sm text-zinc-500 text-center">
                             {outcome === 'done'
-                                ? 'Great work! Save your progress.'
-                                : 'No worries. Capture what happened.'}
+                                ? 'Great work! This will be marked as done in your vault.'
+                                : 'No worries. Let\'s capture what happened.'}
                         </p>
 
                         {/* Editable Block Title */}
-                        {sessionData?.blocks && (
-                            <div className="mt-6 w-full">
-                                {isEditingTitle ? (
-                                    <div className="flex items-center gap-2">
-                                        <Input
-                                            value={editedTitle}
-                                            onChange={(e) => setEditedTitle(e.target.value)}
-                                            className="h-10 text-center text-lg font-medium bg-zinc-800 border-zinc-700"
-                                            autoFocus
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Enter') setIsEditingTitle(false)
-                                            }}
-                                            onBlur={() => setIsEditingTitle(false)}
-                                        />
-                                    </div>
-                                ) : (
-                                    <div
-                                        onClick={() => setIsEditingTitle(true)}
-                                        className="group relative flex w-full cursor-pointer items-center justify-center rounded-lg border border-transparent bg-zinc-800/30 px-4 py-3 hover:border-zinc-700 hover:bg-zinc-800/50"
-                                    >
-                                        <span className="text-lg font-medium text-white">
-                                            {editedTitle || sessionData.blocks.title}
-                                        </span>
-                                        <Pencil className="absolute right-4 h-4 w-4 text-zinc-500 opacity-0 transition-opacity group-hover:opacity-100" />
-                                    </div>
-                                )}
-                                <p className="mt-2 text-xs text-zinc-500 text-center">
-                                    Tap to edit task name
-                                </p>
-                            </div>
-                        )}
+                        <div className="mt-6 w-full">
+                            {isEditingTitle ? (
+                                <Input
+                                    value={editedTitle}
+                                    onChange={(e) => setEditedTitle(e.target.value)}
+                                    className="h-10 text-center text-lg font-medium bg-zinc-800 border-zinc-700"
+                                    autoFocus
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') setIsEditingTitle(false)
+                                    }}
+                                    onBlur={() => setIsEditingTitle(false)}
+                                />
+                            ) : (
+                                <div
+                                    onClick={() => setIsEditingTitle(true)}
+                                    className="group relative flex w-full cursor-pointer items-center justify-center rounded-lg border border-transparent bg-zinc-800/30 px-4 py-3 hover:border-zinc-700 hover:bg-zinc-800/50"
+                                >
+                                    <span className="text-lg font-medium text-white">
+                                        {editedTitle}
+                                    </span>
+                                    <Pencil className="absolute right-4 h-4 w-4 text-zinc-500 opacity-0 transition-opacity group-hover:opacity-100" />
+                                </div>
+                            )}
+                            <p className="mt-2 text-xs text-zinc-500 text-center">
+                                Tap to refine task name for your vault
+                            </p>
+                        </div>
                     </CardContent>
                 </Card>
 
-                {/* Abort Reason (if stopped) */}
-                {outcome === 'aborted' && (
-                    <Card className="border-zinc-800 bg-zinc-900/80 backdrop-blur-xl">
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-sm font-medium text-zinc-400">
-                                Why did you stop?
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                            <Select value={abortReason} onValueChange={setAbortReason}>
-                                <SelectTrigger className="h-12 w-full border-zinc-700 bg-zinc-800/50">
-                                    <SelectValue placeholder="Select a reason" />
-                                </SelectTrigger>
-                                <SelectContent className="max-h-80 w-full border-zinc-700 bg-zinc-900">
-                                    <SelectGroup>
-                                        <SelectLabel className="text-xs font-semibold text-zinc-500">Focus Issues</SelectLabel>
-                                        {ABORT_REASONS.filter(r => r.category === 'focus').map((reason) => (
-                                            <SelectItem key={reason.value} value={reason.value} className="focus:bg-zinc-800">
-                                                <span className="flex items-center gap-2">
-                                                    <span>{reason.emoji}</span>
-                                                    <span>{reason.label}</span>
-                                                </span>
-                                            </SelectItem>
-                                        ))}
-                                    </SelectGroup>
-
-                                    <SelectGroup>
-                                        <SelectLabel className="text-xs font-semibold text-zinc-500">Blocked</SelectLabel>
-                                        {ABORT_REASONS.filter(r => r.category === 'blocked').map((reason) => (
-                                            <SelectItem key={reason.value} value={reason.value} className="focus:bg-zinc-800">
-                                                <span className="flex items-center gap-2">
-                                                    <span>{reason.emoji}</span>
-                                                    <span>{reason.label}</span>
-                                                </span>
-                                            </SelectItem>
-                                        ))}
-                                    </SelectGroup>
-
-                                    <SelectGroup>
-                                        <SelectLabel className="text-xs font-semibold text-zinc-500">Energy</SelectLabel>
-                                        {ABORT_REASONS.filter(r => r.category === 'energy').map((reason) => (
-                                            <SelectItem key={reason.value} value={reason.value} className="focus:bg-zinc-800">
-                                                <span className="flex items-center gap-2">
-                                                    <span>{reason.emoji}</span>
-                                                    <span>{reason.label}</span>
-                                                </span>
-                                            </SelectItem>
-                                        ))}
-                                    </SelectGroup>
-
-                                    <SelectGroup>
-                                        <SelectLabel className="text-xs font-semibold text-zinc-500">Task Scoping</SelectLabel>
-                                        {ABORT_REASONS.filter(r => r.category === 'scoping').map((reason) => (
-                                            <SelectItem key={reason.value} value={reason.value} className="focus:bg-zinc-800">
-                                                <span className="flex items-center gap-2">
-                                                    <span>{reason.emoji}</span>
-                                                    <span>{reason.label}</span>
-                                                </span>
-                                            </SelectItem>
-                                        ))}
-                                    </SelectGroup>
-
-                                    <SelectGroup>
-                                        <SelectLabel className="text-xs font-semibold text-zinc-500">External</SelectLabel>
-                                        {ABORT_REASONS.filter(r => r.category === 'external').map((reason) => (
-                                            <SelectItem key={reason.value} value={reason.value} className="focus:bg-zinc-800">
-                                                <span className="flex items-center gap-2">
-                                                    <span>{reason.emoji}</span>
-                                                    <span>{reason.label}</span>
-                                                </span>
-                                            </SelectItem>
-                                        ))}
-                                    </SelectGroup>
-
-                                    <SelectGroup>
-                                        <SelectLabel className="text-xs font-semibold text-zinc-500">Other</SelectLabel>
-                                        {ABORT_REASONS.filter(r => r.category === 'other').map((reason) => (
-                                            <SelectItem key={reason.value} value={reason.value} className="focus:bg-zinc-800">
-                                                <span className="flex items-center gap-2">
-                                                    <span>{reason.emoji}</span>
-                                                    <span>{reason.label}</span>
-                                                </span>
-                                            </SelectItem>
-                                        ))}
-                                    </SelectGroup>
-                                </SelectContent>
-                            </Select>
-
-                            {/* Show textbox when 'other' is selected */}
-                            {abortReason === 'other' && (
-                                <Textarea
-                                    value={otherReason}
-                                    onChange={(e) => setOtherReason(e.target.value)}
-                                    rows={2}
-                                    className="w-full resize-none border-zinc-700 bg-zinc-800/50 placeholder:text-zinc-600"
-                                    placeholder="What happened?"
-                                    autoFocus
-                                />
-                            )}
-                        </CardContent>
-                    </Card>
-                )}
-
-                {/* Resume Token - Only show after valid reason selected (for aborts) or immediately (for done) */}
-                {(outcome === 'done' || (outcome === 'aborted' && abortReason && (abortReason !== 'other' || otherReason.trim()))) && (
-                    <Card className="border-zinc-800 bg-zinc-900/80 backdrop-blur-xl">
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-sm font-medium text-zinc-400">
-                                What&apos;s the next obvious step?
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                            {/* LLM Suggested Options */}
-                            <div className="flex flex-wrap gap-2">
-                                {[
-                                    outcome === 'done'
-                                        ? 'Review and refactor the completed work'
-                                        : abortReason === 'unclear_next_step' || abortReason === 'task_too_big'
-                                            ? 'Break this task into smaller subtasks'
-                                            : abortReason === 'technical_blocker' || abortReason === 'missing_info'
-                                                ? 'Research the blocker before continuing'
-                                                : 'Resume from where I left off',
-                                    'Move to a different priority task',
-                                    'Schedule a follow-up block',
-                                ].map((suggestion, index) => (
-                                    <button
-                                        key={index}
-                                        onClick={() => setResumeToken(suggestion)}
-                                        className={cn(
-                                            "rounded-lg px-3 py-2 text-xs font-medium transition-all",
-                                            resumeToken === suggestion
-                                                ? "bg-white text-black"
-                                                : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700 ring-1 ring-zinc-700"
-                                        )}
-                                    >
-                                        {suggestion}
-                                    </button>
-                                ))}
-                            </div>
-
-                            {/* Custom Input */}
-                            <div className="relative">
-                                <Textarea
-                                    value={resumeToken}
-                                    onChange={(e) => setResumeToken(e.target.value)}
-                                    rows={2}
-                                    className="resize-none border-zinc-700 bg-zinc-800/50 placeholder:text-zinc-600"
-                                    placeholder="Or type your own..."
-                                />
-                            </div>
-
-                            <p className="text-xs text-zinc-600">
-                                💡 This helps you pick up instantly next time.
-                            </p>
-                        </CardContent>
-                    </Card>
-                )}
+                {/* Resume Token */}
+                <Card className="border-zinc-800 bg-zinc-900/80 backdrop-blur-xl">
+                    <CardHeader className="pb-3">
+                        <CardTitle className="text-sm font-medium text-zinc-400">
+                            What&apos;s the next obvious step?
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                        <Textarea
+                            value={resumeToken}
+                            onChange={(e) => setResumeToken(e.target.value)}
+                            rows={3}
+                            className="resize-none border-zinc-700 bg-zinc-800/50 placeholder:text-zinc-600"
+                            placeholder="Type the exact next step to reduce friction next time..."
+                        />
+                        <p className="text-xs text-zinc-600">
+                            💡 This will be appended as a sub-bullet in your Obsidian note.
+                        </p>
+                    </CardContent>
+                </Card>
 
                 {/* Save Button */}
                 <Button
                     onClick={handleSave}
-                    disabled={!isValid || isSaving}
+                    disabled={isSaving}
                     size="lg"
                     className="h-14 w-full bg-white text-lg font-semibold text-black hover:bg-zinc-200 disabled:opacity-50"
                 >
                     {isSaving ? (
                         <span className="flex items-center gap-2">
                             <span className="h-4 w-4 animate-spin rounded-full border-2 border-black border-t-transparent" />
-                            Saving...
+                            UPDATING VAULT...
                         </span>
                     ) : (
-                        'SAVE & RETURN'
+                        'SAVE TO OBSIDIAN'
                     )}
                 </Button>
 
@@ -375,9 +153,9 @@ function SavePageContent() {
                 <Button
                     variant="ghost"
                     className="w-full text-zinc-500 hover:text-white"
-                    onClick={handleSave}
+                    onClick={() => router.push('/now')}
                 >
-                    Skip for now
+                    Discard Session
                 </Button>
             </div>
         </div>

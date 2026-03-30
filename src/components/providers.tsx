@@ -2,8 +2,6 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useState } from 'react'
-import { CalendarSyncProvider } from './CalendarSyncProvider'
-import { RoutineSyncProvider } from './RoutineSyncProvider'
 
 export function Providers({ children }: { children: React.ReactNode }) {
     const [queryClient] = useState(
@@ -19,9 +17,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
     return (
         <QueryClientProvider client={queryClient}>
-            <CalendarSyncProvider>
-                <RoutineSyncProvider>{children}</RoutineSyncProvider>
-            </CalendarSyncProvider>
+            {children}
         </QueryClientProvider>
     )
 }

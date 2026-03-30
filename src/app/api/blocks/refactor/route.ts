@@ -2,7 +2,6 @@
 // Analyzes remaining blocks and proposes a new schedule based on current time and progress.
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 
 interface Block {
     id: string
@@ -15,13 +14,6 @@ interface Block {
 }
 
 export async function POST(request: NextRequest) {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-        return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
-    }
-
     try {
         const { blocks } = await request.json() as { blocks: Block[] }
         

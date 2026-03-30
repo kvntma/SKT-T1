@@ -1,28 +1,38 @@
 'use client'
 
-import { useQuery } from '@tanstack/react-query'
-import { createClient } from '@/lib/supabase/client'
-import type { Task } from '@/types/database'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import type { ObsidianTask } from '@/types'
 
-export function useTasks(type?: 'task' | 'routine' | 'goal') {
-    const supabase = createClient()
+export function useTasks() {
+    const queryClient = useQueryClient()
 
-    return useQuery({
-        queryKey: ['tasks', type],
+    const tasksQuery = useQuery({
+        queryKey: ['tasks'],
         queryFn: async () => {
-            let query = supabase
-                .from('tasks')
-                .select('*')
-                .order('priority', { ascending: true })
-
-            if (type) {
-                query = query.eq('task_type', type)
-            }
-
-            const { data, error } = await query
-
-            if (error) throw error
-            return data as Task[]
+            const response = await fetch('/api/obsidian/tasks');
+            if (!response.ok) throw new Error('Failed to fetch tasks from Obsidian');
+            const data = await response.json();
+            return data.tasks as ObsidianTask[];
         },
     })
+
+    const completeTask = useMutation({
+        mutationFn: async ({ lineIndex, completed }: { lineIndex: number, completed: boolean }) => {
+            const response = await fetch('/api/obsidian/tasks/complete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ lineIndex, completed }),
+            });
+            if (!response.ok) throw new Error('Failed to update task status');
+            return response.json();
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['tasks'] });
+        },
+    })
+
+    return {
+        ...tasksQuery,
+        completeTask,
+    }
 }

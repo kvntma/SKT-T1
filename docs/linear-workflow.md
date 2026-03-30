@@ -46,6 +46,24 @@ Backlog → Todo → In Progress → In Review → Done
                     └────── Canceled ◀───────┘
 ```
 
+## Ticket Hygiene & Deduplication
+
+To avoid disjointed updates and redundant tickets during rapid iteration:
+
+### 1. Search-First Mandate
+Before creating a new ticket or starting work on a "new" idea, search Linear for similar keywords or existing goals.
+- **Rule**: If a similar ticket exists (even if in "Backlog"), **Update** it instead of creating a new one.
+- **Goal**: Consolidate intent into single points of truth.
+
+### 2. Updating Over Creating
+If a new idea is an evolution of an existing task:
+- Append the new idea as a **Sub-issue** or a **Comment** to the existing ticket.
+- Adjust the **Estimate** and **Priority** of the original ticket to reflect the change.
+
+### 3. State Management
+- Use **Canceled** for items that were determined to be duplicates or superseded by better ideas.
+- Document *why* it was canceled to preserve context.
+
 | State | Meaning |
 |-------|---------|
 | **Backlog** | Captured but not scheduled |
