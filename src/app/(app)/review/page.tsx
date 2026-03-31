@@ -95,7 +95,7 @@ export default function ReviewChat() {
       {/* Messages Area - More Spacious */}
       <div 
         ref={scrollRef}
-        className="flex-1 overflow-y-auto px-6 py-8 space-y-8 scroll-smooth custom-scrollbar"
+        className="flex-1 overflow-y-auto px-4 md:px-8 py-8 space-y-12 max-w-5xl mx-auto w-full scroll-smooth custom-scrollbar"
       >
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-muted-foreground/40 space-y-4 py-20">
@@ -133,7 +133,7 @@ export default function ReviewChat() {
 
               <div 
                 className={cn(
-                  "max-w-[85%] md:max-w-[75%] px-5 py-4 rounded-2xl shadow-sm transition-all",
+                  "max-w-[85%] md:max-w-[80%] px-6 py-5 rounded-3xl shadow-sm transition-all",
                   m.role === 'user' 
                     ? 'bg-primary text-primary-foreground rounded-tr-none' 
                     : 'bg-card border border-border text-card-foreground rounded-tl-none shadow-md'
@@ -148,8 +148,8 @@ export default function ReviewChat() {
                       return (
                         <div key={i} className={cn(
                           isReasoning 
-                            ? "text-[11px] leading-snug italic text-muted-foreground bg-muted/50 p-3 rounded-lg border-l-2 border-primary/30 my-3 font-mono" 
-                            : "prose prose-sm dark:prose-invert max-w-none text-sm leading-relaxed mb-4 prose-p:my-1.5 prose-headings:mb-2 prose-headings:mt-4 prose-li:my-0.5"
+                            ? "text-[12px] leading-relaxed italic text-muted-foreground bg-muted/50 p-4 rounded-xl border-l-2 border-primary/30 my-4 font-mono" 
+                            : "prose prose-base dark:prose-invert max-w-none text-[15px] leading-relaxed mb-6 prose-p:my-4 prose-headings:mb-4 prose-headings:mt-6 prose-li:my-1.5 prose-ul:my-4"
                         )}>
                           {isReasoning && (
                             <div className="flex items-center gap-1.5 text-[9px] non-italic font-bold mb-2 opacity-70 uppercase tracking-tighter">
