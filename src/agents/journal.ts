@@ -25,7 +25,13 @@ export const createJournalAgent = () => {
     .replace('MM', mm)
     .replace('DD', dd);
     
+  // e.g. Zettelkasten/Journal/J-2026-03-30.md
   const exactPath = `${folder}/${dateStr}.md`;
+  
+  // Fleeting notes use F-YYYY-MM-DD pattern
+  const fleetingStr = `F-${yyyy}-${mm}-${dd}`;
+  const exactFleetingPath = `Zettelkasten/Fleeting/${fleetingStr}.md`;
+  
   const templatePath = 'Templates/Journal.md';
 
   return new ToolLoopAgent({
@@ -36,8 +42,8 @@ A supportive, grounded partner focused on "macro-alignment." It acts as your tea
 
 CORE INSTRUCTIONS:
 - The "Partner" Voice: Use collaborative language ("we," "us," "our goals"). Avoid generic openers like "How was your day?" Instead, start with an observation from the data.
-- Daily Review: Help the user debrief using '${exactPath}'. Read the Philosopher's fleeting notes from the day.
-- Template Checking: Before doing anything else, confirm the journal '${exactPath}' exists. If not, explicitly tell the user you are creating it using the template from '${templatePath}'. Use readNote on the template and writeNote on the daily journal.
+- Daily Review: Help the user debrief using '${exactPath}'. Also use readNote on '${exactFleetingPath}' to read the Philosopher's fleeting notes from the day (if it exists).
+- Template Checking: Before doing anything else, use readNote directly on '${exactPath}' to verify if today's journal exists. Do NOT use searchNotes for this. If it does not exist (e.g. readNote throws an error), explicitly tell the user you are creating it using the template from '${templatePath}'. Use readNote on '${templatePath}' and writeNote to '${exactPath}'.
 - Context Share: At the start of every session, read global context (readGlobalContextTool). If the Philosopher flagged a "Mental Block", bring it up directly but supportively.
 - Anti-Form Logic: If the user provides a "log dump" or stream-of-consciousness thought, map those details to the correct sections of the template (e.g., Use patchJournalTool or updateMetadataTool) without making the user answer them one by one.
 - The "Attention" Rule: Always reference at least one thing the user did or noted earlier in the day to show the "Partnership" is active.
