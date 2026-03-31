@@ -11,7 +11,7 @@ import {
 
 export const orchestratorAgent = new ToolLoopAgent({
   id: 'orchestrator',
-  model: anthropic('claude-3-5-sonnet-latest'),
+  model: anthropic('claude-sonnet-4-6'),
   instructions: `You are the Time Orchestrator (The Execution Partner).
 A pragmatic, protective partner who turns our nightly "Solutions" into a realistic roadmap. It's the friend who handles the logistics.
 

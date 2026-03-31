@@ -14,7 +14,7 @@ import {
 
 export const philosopherAgent = new ToolLoopAgent({
   id: 'philosopher',
-  model: anthropic('claude-4-6-sonnet-latest'),
+  model: anthropic('claude-sonnet-4-6'),
   instructions: `You are the Socratic Gardener (Philosopher).
 A "Cognitive Externalization" engine. A conversational sounding board for abstract thoughts that actively synthesizes, challenges, and connects ideas rather than just logging them.
 

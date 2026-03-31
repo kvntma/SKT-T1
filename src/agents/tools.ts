@@ -22,33 +22,33 @@ const CONTEXT_PATH = path.join(process.cwd(), 'docs/active-context.json');
 
 export const readNoteTool = tool({
   description: 'Read the full content of a specific note.',
-  parameters: jsonSchema<{ path: string }>({
+  inputSchema: jsonSchema({
     type: 'object',
-    properties: { path: { type: 'string' } },
+    properties: { path: { type: 'string', description: 'Relative path to the note.' } },
     required: ['path'],
   }),
   execute: async ({ path }) => {
     console.log(`[Tool] Reading: "${path}"`);
-    return await readNote(path);
+    return await readNote(path as string);
   },
 });
 
 export const searchNotesTool = tool({
   description: 'Search for notes in the Obsidian vault.',
-  parameters: jsonSchema<{ query: string }>({
+  inputSchema: jsonSchema({
     type: 'object',
-    properties: { query: { type: 'string' } },
+    properties: { query: { type: 'string', description: 'Search query.' } },
     required: ['query'],
   }),
   execute: async ({ query }) => {
     console.log(`[Tool] Searching for: "${query}"`);
-    return await searchNotes(query);
+    return await searchNotes(query as string);
   },
 });
 
 export const writeNoteTool = tool({
   description: 'Create a new note or completely overwrite an existing one.',
-  parameters: jsonSchema<{ targetPath: string; content: string }>({
+  inputSchema: jsonSchema({
     type: 'object',
     properties: { 
       targetPath: { type: 'string' },
@@ -58,14 +58,14 @@ export const writeNoteTool = tool({
   }),
   execute: async ({ targetPath, content }) => {
     console.log(`[Tool] Writing to: "${targetPath}"`);
-    await writeNote(targetPath, content);
+    await writeNote(targetPath as string, content as string);
     return `Successfully wrote to ${targetPath}`;
   },
 });
 
 export const appendNoteTool = tool({
   description: 'Add content to the bottom of a note.',
-  parameters: jsonSchema<{ targetPath: string; content: string }>({
+  inputSchema: jsonSchema({
     type: 'object',
     properties: { 
       targetPath: { type: 'string' },
@@ -75,7 +75,7 @@ export const appendNoteTool = tool({
   }),
   execute: async ({ targetPath, content }) => {
     console.log(`[Tool] Appending to: "${targetPath}"`);
-    await appendToNote(targetPath, content);
+    await appendToNote(targetPath as string, content as string);
     return `Successfully appended to ${targetPath}`;
   },
 });
@@ -84,34 +84,34 @@ export const appendNoteTool = tool({
 
 export const getNearbyNotesTool = tool({
   description: 'Find semantically related notes.',
-  parameters: jsonSchema<{ targetPath: string }>({
+  inputSchema: jsonSchema({
     type: 'object',
     properties: { targetPath: { type: 'string' } },
     required: ['targetPath'],
   }),
   execute: async ({ targetPath }) => {
     console.log(`[Tool] Finding connections for: "${targetPath}"`);
-    return await getSmartConnections(targetPath);
+    return await getSmartConnections(targetPath as string);
   },
 });
 
 export const createBacklinksTool = tool({
   description: 'Scans a note and adds [[wikilinks]] to recognized concepts.',
-  parameters: jsonSchema<{ targetPath: string }>({
+  inputSchema: jsonSchema({
     type: 'object',
     properties: { targetPath: { type: 'string' } },
     required: ['targetPath'],
   }),
   execute: async ({ targetPath }) => {
     console.log(`[Tool] Creating backlinks in: "${targetPath}"`);
-    const result = await batchAutoLink(targetPath);
+    const result = await batchAutoLink(targetPath as string);
     return `Backlinking complete. Modified ${result.modified} files, added ${result.linksAdded} links.`;
   },
 });
 
 export const discoverGhostLinksTool = tool({
   description: 'Identify potential new notes. ONLY use this if the user explicitly asks for a vault audit.',
-  parameters: jsonSchema<Record<string, never>>({
+  inputSchema: jsonSchema({
     type: 'object',
     properties: {},
     required: [],
@@ -142,7 +142,7 @@ export const discoverGhostLinksTool = tool({
 
 export const updateMetadataTool = tool({
   description: 'Update a specific YAML frontmatter key in a note.',
-  parameters: jsonSchema<{ targetPath: string; key: string; value: string }>({
+  inputSchema: jsonSchema({
     type: 'object',
     properties: {
       targetPath: { type: 'string' },
@@ -153,14 +153,14 @@ export const updateMetadataTool = tool({
   }),
   execute: async ({ targetPath, key, value }) => {
     console.log(`[Tool] Updating metadata in: "${targetPath}" - ${key}: ${value}`);
-    await updateFrontmatter(targetPath, key, value);
+    await updateFrontmatter(targetPath as string, key as string, value as string);
     return `Successfully updated metadata ${key} in ${targetPath}`;
   },
 });
 
 export const patchJournalTool = tool({
   description: 'Surgically replace a placeholder or specific text in a note.',
-  parameters: jsonSchema<{ targetPath: string; search: string; replacement: string }>({
+  inputSchema: jsonSchema({
     type: 'object',
     properties: {
       targetPath: { type: 'string' },
@@ -171,7 +171,7 @@ export const patchJournalTool = tool({
   }),
   execute: async ({ targetPath, search, replacement }) => {
     console.log(`[Tool] Patching: "${targetPath}"`);
-    const success = await patchNote(targetPath, search, replacement);
+    const success = await patchNote(targetPath as string, search as string, replacement as string);
     return success ? `Successfully patched ${targetPath}` : `Failed to find exact match for "${search}" in ${targetPath}`;
   },
 });
@@ -180,7 +180,7 @@ export const patchJournalTool = tool({
 
 export const scheduleTaskTool = tool({
   description: 'Schedule a fixed time block in Google Calendar.',
-  parameters: jsonSchema<{ title: string; startTime: string; endTime: string; description?: string }>({
+  inputSchema: jsonSchema({
     type: 'object',
     properties: {
       title: { type: 'string' },
@@ -193,7 +193,7 @@ export const scheduleTaskTool = tool({
   execute: async ({ title, startTime, endTime, description }) => {
     console.log(`[Tool] Scheduling event: "${title}"`);
     try {
-      const result = await scheduleCalendarEvent(title, new Date(startTime), new Date(endTime), description || '');
+      const result = await scheduleCalendarEvent(title as string, new Date(startTime as string), new Date(endTime as string), (description as string) || '');
       return `Scheduled "${title}". Event link: ${result.htmlLink}`;
     } catch (error: any) {
       return `Failed to schedule. Error: ${error.message}`;
@@ -205,7 +205,7 @@ export const scheduleTaskTool = tool({
 
 export const readGlobalContextTool = tool({
   description: 'Read the shared global context file.',
-  parameters: jsonSchema<Record<string, never>>({
+  inputSchema: jsonSchema({
     type: 'object',
     properties: {},
     required: []
@@ -223,7 +223,7 @@ export const readGlobalContextTool = tool({
 
 export const writeGlobalContextTool = tool({
   description: 'Write/update the shared global context file.',
-  parameters: jsonSchema<{ bigIdeas: string[]; tacticalAdjustments: string[]; cognitiveLoad: 'Low' | 'Normal' | 'High' }>({
+  inputSchema: jsonSchema({
     type: 'object',
     properties: {
       bigIdeas: { type: 'array', items: { type: 'string' } },

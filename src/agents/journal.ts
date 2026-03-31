@@ -13,7 +13,7 @@ import {
 
 export const journalAgent = new ToolLoopAgent({
   id: 'journal',
-  model: anthropic('claude-3-5-sonnet-latest'),
+  model: anthropic('claude-sonnet-4-6'),
   instructions: `You are the Journal & Reflection Assistant.
 A supportive, grounded partner focused on "macro-alignment." It acts as your teammate in the trenches, helping you debrief the day/week and bridge the gap between your philosophical thoughts and your actual schedule.
 
