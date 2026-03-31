@@ -1,152 +1,235 @@
 'use client';
 
 import { useChat } from '@ai-sdk/react';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Send, Terminal, Search, FileText, Sparkles, AlertCircle, User, Bot, Loader2, BrainCircuit, BookOpen, CalendarClock } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { cn } from '@/lib/utils';
 
 export default function ReviewChat() {
-  const [input, setInput] = useState('');
-  const { messages, sendMessage, isLoading, error, status } = useChat({
-    maxSteps: 10,
+  const [inputValue, setInputValue] = useState('');
+  const [agentId, setAgentId] = useState('philosopher');
+  const scrollRef = useRef<HTMLDivElement>(null);
+  
+  const { messages, setMessages, sendMessage, error, status } = useChat({
     onError: (err) => {
       console.error('Chat Error (onError hook):', err);
     }
   });
 
-  // Debug: Log messages when they change
+  const isLoading = status === 'submitted' || status === 'streaming';
+
+  // Auto-scroll to bottom
   useEffect(() => {
-    if (messages.length > 0) {
-      console.log('--- Messages Updated ---');
-      messages.forEach((m, idx) => {
-        console.log(`Msg ${idx} (${m.role}):`, m);
-      });
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, [messages, isLoading]);
 
   const onFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!input.trim() || isLoading) return;
+    if (!inputValue.trim() || isLoading) return;
 
-    const currentInput = input;
-    setInput('');
+    const currentInput = inputValue;
+    setInputValue('');
 
     try {
-      await sendMessage({ text: currentInput });
+      await sendMessage({ text: currentInput }, { body: { agentId } });
     } catch (err) {
       console.error('sendMessage failed:', err);
-      setInput(currentInput);
+      setInputValue(currentInput);
     }
   };
 
   return (
-    <div className="flex flex-col h-full max-w-4xl mx-auto p-4 bg-zinc-950 text-zinc-100">
-      <header className="mb-8">
-        <h1 className="text-2xl font-bold text-zinc-100">Knowledge Architect</h1>
-        <p className="text-zinc-400 text-sm">Reviewing your Obsidian Vault</p>
+    <div className="flex flex-col h-full w-full max-w-6xl mx-auto bg-background text-foreground">
+      {/* Header - Tactical/Functional */}
+      <header className="px-6 py-4 border-b border-border/40 flex items-center justify-between bg-background/50 backdrop-blur-md sticky top-0 z-10 flex-wrap gap-4">
+        <div className="flex items-center space-x-3">
+          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center border border-primary/20">
+            {agentId === 'philosopher' && <BrainCircuit className="w-4 h-4 text-primary" />}
+            {agentId === 'journal' && <BookOpen className="w-4 h-4 text-primary" />}
+            {agentId === 'orchestrator' && <CalendarClock className="w-4 h-4 text-primary" />}
+          </div>
+          <div>
+            <h1 className="text-sm font-bold tracking-tight uppercase flex items-center gap-2">
+              {agentId === 'philosopher' && 'The Philosopher'}
+              {agentId === 'journal' && 'Journal Assistant'}
+              {agentId === 'orchestrator' && 'Time Orchestrator'}
+              <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded border border-primary/20 font-mono">v2.0</span>
+            </h1>
+            <p className="text-muted-foreground text-[10px] font-mono uppercase tracking-widest">Neural Bridge Active</p>
+          </div>
+        </div>
+
+        <Tabs value={agentId} onValueChange={setAgentId} className="flex-1 max-w-sm mx-4">
+          <TabsList className="grid w-full grid-cols-3 h-9 bg-muted/40 border border-border/40">
+            <TabsTrigger value="philosopher" className="text-[10px] uppercase font-mono tracking-widest">Philosopher</TabsTrigger>
+            <TabsTrigger value="journal" className="text-[10px] uppercase font-mono tracking-widest">Journal</TabsTrigger>
+            <TabsTrigger value="orchestrator" className="text-[10px] uppercase font-mono tracking-widest">Scheduler</TabsTrigger>
+          </TabsList>
+        </Tabs>
+        
+        <div className="flex items-center space-x-2">
+          <div className={cn(
+            "w-2 h-2 rounded-full animate-pulse",
+            isLoading ? "bg-amber-500" : "bg-emerald-500"
+          )} />
+          <span className="text-[10px] font-mono text-muted-foreground uppercase">{isLoading ? 'Processing' : 'Standby'}</span>
+        </div>
       </header>
       
+      {/* Error State */}
       {error && (
-        <div className="p-4 mb-4 bg-red-900/20 border border-red-900/50 rounded-lg text-red-200 text-sm">
-          <strong>Error:</strong> {error.message}
+        <div className="mx-6 mt-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive text-xs flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          <p><strong>Error:</strong> {error.message}</p>
         </div>
       )}
 
-      {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto mb-6 space-y-6 pr-2 custom-scrollbar">
+      {/* Messages Area - More Spacious */}
+      <div 
+        ref={scrollRef}
+        className="flex-1 overflow-y-auto px-6 py-8 space-y-8 scroll-smooth custom-scrollbar"
+      >
         {messages.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-zinc-500 space-y-2">
-            <p>No active session. Start by asking about your notes.</p>
+          <div className="h-full flex flex-col items-center justify-center text-muted-foreground/40 space-y-4 py-20">
+            <div className="w-16 h-16 rounded-2xl bg-muted/30 flex items-center justify-center border border-dashed border-muted-foreground/20">
+              <Terminal className="w-8 h-8" />
+            </div>
+            <div className="text-center space-y-1">
+              <p className="text-sm font-medium">Initializing Neural Bridge...</p>
+              <p className="text-xs font-mono uppercase tracking-tighter">Awaiting vault query</p>
+            </div>
           </div>
         ) : (
           messages.map((m) => (
             <div 
               key={m.id} 
-              className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'}`}
+              className={cn(
+                "flex flex-col animate-in fade-in slide-in-from-bottom-2 duration-300",
+                m.role === 'user' ? 'items-end' : 'items-start'
+              )}
             >
-              <div 
-                className={`max-w-[90%] px-4 py-3 rounded-2xl ${
-                  m.role === 'user' 
-                    ? 'bg-blue-600 text-white rounded-tr-none' 
-                    : 'bg-zinc-900 border border-zinc-800 text-zinc-100 rounded-tl-none shadow-xl'
-                }`}
-              >
-                <div className="text-[10px] opacity-50 mb-1.5 font-bold uppercase tracking-wider">
-                  {m.role === 'user' ? 'User' : 'Architect'}
+              <div className={cn(
+                "flex items-center gap-2 mb-2 px-1",
+                m.role === 'user' ? 'flex-row-reverse' : 'flex-row'
+              )}>
+                <div className={cn(
+                  "w-5 h-5 rounded-md flex items-center justify-center border",
+                  m.role === 'user' ? "bg-muted border-border" : "bg-primary/10 border-primary/20"
+                )}>
+                  {m.role === 'user' ? <User className="w-3 h-3" /> : <Bot className="w-3 h-3 text-primary" />}
                 </div>
-                
-                <div className="space-y-3">
-                  {/* Standard content */}
-                  {m.content && <div className="whitespace-pre-wrap text-sm leading-relaxed">{m.content}</div>}
-                  
+                <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-muted-foreground">
+                  {m.role === 'user' ? 'User' : 'Architect'}
+                </span>
+              </div>
+
+              <div 
+                className={cn(
+                  "max-w-[85%] md:max-w-[75%] px-5 py-4 rounded-2xl shadow-sm transition-all",
+                  m.role === 'user' 
+                    ? 'bg-primary text-primary-foreground rounded-tr-none' 
+                    : 'bg-card border border-border text-card-foreground rounded-tl-none shadow-md'
+                )}
+              >
+                <div className="space-y-4">
                   {/* Multi-part content rendering */}
                   {m.parts?.map((part: any, i) => {
                     // 1. Text Content
                     if (part.text) {
                       const isReasoning = part.type === 'reasoning' || part.type === 'thought';
                       return (
-                        <div key={i} className={isReasoning ? "text-xs italic text-zinc-400 bg-zinc-800/30 p-2 rounded-lg border-l-2 border-zinc-700 my-2" : "whitespace-pre-wrap text-sm leading-relaxed"}>
-                          {isReasoning && <span className="block text-[10px] non-italic font-bold mb-1 opacity-50 uppercase">Internal Reasoning</span>}
+                        <div key={i} className={cn(
+                          isReasoning 
+                            ? "text-[11px] leading-snug italic text-muted-foreground bg-muted/50 p-3 rounded-lg border-l-2 border-primary/30 my-3 font-mono" 
+                            : "whitespace-pre-wrap text-sm leading-relaxed"
+                        )}>
+                          {isReasoning && (
+                            <div className="flex items-center gap-1.5 text-[9px] non-italic font-bold mb-2 opacity-70 uppercase tracking-tighter">
+                              <Terminal className="w-2.5 h-2.5" />
+                              Internal Analysis Cycle
+                            </div>
+                          )}
                           {part.text}
                         </div>
                       );
                     }
                     
-                    // 2. Tool Results (The meat of the vault search)
+                    // 2. Tool Results (Modernized)
                     if (part.type?.startsWith('tool-')) {
                       const toolName = part.type.replace('tool-', '');
                       return (
-                        <div key={i} className="my-2 p-3 bg-zinc-950 border border-zinc-800 rounded-xl overflow-hidden shadow-inner">
-                          <div className="flex items-center space-x-2 text-[10px] font-mono text-blue-400 mb-2 font-bold uppercase">
-                            <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></span>
-                            <span>{toolName} result</span>
+                        <div key={i} className="my-3 border border-border/60 rounded-xl overflow-hidden bg-background/40 backdrop-blur-sm shadow-inner">
+                          <div className="flex items-center justify-between px-3 py-2 bg-muted/40 border-b border-border/40">
+                            <div className="flex items-center space-x-2 text-[9px] font-mono text-primary font-bold uppercase tracking-wider">
+                              <span className="relative flex h-2 w-2">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+                              </span>
+                              <span>{toolName} output</span>
+                            </div>
+                            {toolName === 'searchNotes' && part.output && (
+                              <span className="text-[9px] font-mono text-muted-foreground italic">
+                                {Array.isArray(part.output) ? `${part.output.length} nodes matched` : ''}
+                              </span>
+                            )}
                           </div>
                           
-                          {/* Search Results Rendering */}
-                          {toolName === 'searchNotes' && Array.isArray(part.output) && (
-                            <div className="space-y-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
-                              {part.output.length === 0 ? (
-                                <p className="text-xs text-zinc-500 italic">No matches found.</p>
-                              ) : (
-                                part.output.map((res: any, idx: number) => (
-                                  <div key={idx} className="group cursor-default">
-                                    <div className="text-xs font-semibold text-zinc-300 group-hover:text-blue-400 transition-colors truncate">
-                                      📄 {res.path}
-                                    </div>
-                                    <div className="text-[11px] text-zinc-500 mt-1 line-clamp-2 leading-snug">
-                                      {res.excerpt}
-                                    </div>
+                          <div className="p-3">
+                            {/* Search Results Rendering */}
+                            {toolName === 'searchNotes' && Array.isArray(part.output) && (
+                              <div className="space-y-2 max-h-80 overflow-y-auto pr-1 custom-scrollbar">
+                                {part.output.length === 0 ? (
+                                  <div className="flex flex-col items-center py-4 text-muted-foreground/60 italic text-[10px]">
+                                    <Search className="w-4 h-4 mb-1 opacity-20" />
+                                    No cognitive nodes discovered.
                                   </div>
-                                ))
-                              )}
-                            </div>
-                          )}
+                                ) : (
+                                  part.output.map((res: any, idx: number) => (
+                                    <div key={idx} className="group p-2 rounded-md hover:bg-primary/5 transition-colors border border-transparent hover:border-primary/10">
+                                      <div className="flex items-start gap-2">
+                                        <FileText className="w-3 h-3 mt-0.5 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
+                                        <div className="min-w-0 flex-1">
+                                          <div className="text-[11px] font-bold text-foreground group-hover:text-primary transition-colors truncate font-mono">
+                                            {res.path}
+                                          </div>
+                                          {res.excerpt && (
+                                            <div className="text-[10px] text-muted-foreground mt-1 line-clamp-2 leading-relaxed opacity-80 group-hover:opacity-100">
+                                              {res.excerpt}
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))
+                                )}
+                              </div>
+                            )}
 
-                          {/* Read Note Rendering */}
-                          {toolName === 'readNote' && typeof part.output === 'string' && (
-                            <div className="text-xs text-zinc-400 max-h-60 overflow-y-auto font-mono bg-zinc-900/50 p-2 rounded">
-                              {part.output}
-                            </div>
-                          )}
+                            {/* Read Note Rendering */}
+                            {toolName === 'readNote' && typeof part.output === 'string' && (
+                              <div className="text-[11px] text-muted-foreground max-h-80 overflow-y-auto font-mono bg-background/60 p-3 rounded border border-border/40 whitespace-pre-wrap leading-relaxed custom-scrollbar">
+                                {part.output}
+                              </div>
+                            )}
 
-                          {/* General JSON fallback for other tools */}
-                          {toolName !== 'searchNotes' && toolName !== 'readNote' && part.output && (
-                            <pre className="text-[10px] text-zinc-500 overflow-x-auto">
-                              {JSON.stringify(part.output, null, 2)}
-                            </pre>
-                          )}
+                            {/* General JSON fallback for other tools */}
+                            {toolName !== 'searchNotes' && toolName !== 'readNote' && part.output && (
+                              <pre className="text-[10px] text-muted-foreground overflow-x-auto p-2 font-mono">
+                                {JSON.stringify(part.output, null, 2)}
+                              </pre>
+                            )}
+                          </div>
                         </div>
                       );
                     }
 
                     return null;
                   })}
-
-                  {/* Empty state during multi-step processes */}
-                  {!m.content && (!m.parts || m.parts.length === 0) && (
-                    <div className="flex items-center space-x-2 text-zinc-500 text-xs italic">
-                      <div className="w-1.5 h-1.5 bg-zinc-600 rounded-full animate-ping"></div>
-                      <span>Architect is analyzing the vault...</span>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
@@ -154,31 +237,47 @@ export default function ReviewChat() {
         )}
         
         {/* Global Loading State */}
-        {(isLoading || status === 'submitted' || status === 'streaming') && (
-          <div className="flex items-center space-x-2 px-2 text-zinc-500 text-xs animate-pulse">
-            <div className="w-1.5 h-1.5 bg-zinc-500 rounded-full"></div>
-            <span>Deep in the vault...</span>
+        {isLoading && (
+          <div className="flex items-center space-x-3 px-1 animate-in fade-in duration-500">
+            <div className="w-6 h-6 rounded-md bg-primary/10 flex items-center justify-center border border-primary/20">
+              <Loader2 className="w-3 h-3 text-primary animate-spin" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[10px] font-mono text-primary font-bold uppercase tracking-widest animate-pulse">Syncing with vault</span>
+              <span className="text-[9px] text-muted-foreground/60 uppercase tracking-tighter">Parsing semantic clusters...</span>
+            </div>
           </div>
         )}
       </div>
 
-      {/* Input Area */}
-      <form onSubmit={onFormSubmit} className="relative mt-auto pt-4 border-t border-zinc-900/50">
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Ask your vault (e.g., 'Summarize my dopamine notes')"
-          className="w-full bg-zinc-900 border border-zinc-800 text-zinc-100 rounded-2xl px-5 py-4 pr-14 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/50 transition-all placeholder:text-zinc-600 shadow-2xl"
-          disabled={isLoading}
-        />
-        <button 
-          type="submit" 
-          disabled={isLoading || !input.trim()}
-          className="absolute right-3 top-[calc(50%+8px)] -translate-y-1/2 p-2 text-zinc-400 hover:text-blue-400 disabled:opacity-20 transition-all hover:scale-110 active:scale-95"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>
-        </button>
-      </form>
+      {/* Input Area - Redesigned for focus */}
+      <div className="p-6 border-t border-border/40 bg-background/50 backdrop-blur-md">
+        <form onSubmit={onFormSubmit} className="relative max-w-4xl mx-auto flex items-center gap-3">
+          <div className="relative flex-1 group">
+            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground/40 group-focus-within:text-primary transition-colors">
+              <Search className="w-4 h-4" />
+            </div>
+            <Input
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              placeholder="Query the architect..."
+              className="h-12 pl-11 pr-4 bg-muted/30 border-border/60 hover:border-border transition-all rounded-xl focus-visible:ring-primary/20 focus-visible:border-primary"
+              disabled={isLoading}
+            />
+          </div>
+          <Button 
+            type="submit" 
+            disabled={isLoading || !inputValue.trim()}
+            size="icon-lg"
+            className="rounded-xl shrink-0 shadow-lg shadow-primary/10 transition-all hover:scale-105 active:scale-95"
+          >
+            <Send className="w-4 h-4" />
+          </Button>
+        </form>
+        <p className="mt-3 text-center text-[9px] text-muted-foreground/40 font-mono uppercase tracking-[0.2em]">
+          End-to-end semantic bridge active • {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        </p>
+      </div>
     </div>
   );
 }
