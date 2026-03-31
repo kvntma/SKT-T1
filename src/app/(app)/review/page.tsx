@@ -1,5 +1,8 @@
 'use client';
 
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
 import { useChat } from '@ai-sdk/react';
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, Terminal, Search, FileText, Sparkles, AlertCircle, User, Bot, Loader2, BrainCircuit, BookOpen, CalendarClock } from 'lucide-react';
@@ -146,7 +149,7 @@ export default function ReviewChat() {
                         <div key={i} className={cn(
                           isReasoning 
                             ? "text-[11px] leading-snug italic text-muted-foreground bg-muted/50 p-3 rounded-lg border-l-2 border-primary/30 my-3 font-mono" 
-                            : "whitespace-pre-wrap text-sm leading-relaxed"
+                            : "prose prose-sm dark:prose-invert max-w-none text-sm leading-relaxed mb-4 prose-p:my-1.5 prose-headings:mb-2 prose-headings:mt-4 prose-li:my-0.5"
                         )}>
                           {isReasoning && (
                             <div className="flex items-center gap-1.5 text-[9px] non-italic font-bold mb-2 opacity-70 uppercase tracking-tighter">
@@ -154,7 +157,12 @@ export default function ReviewChat() {
                               Internal Analysis Cycle
                             </div>
                           )}
-                          {part.text}
+                          <ReactMarkdown 
+                            remarkPlugins={[remarkGfm]}
+                            rehypePlugins={[rehypeRaw]}
+                          >
+                            {part.text}
+                          </ReactMarkdown>
                         </div>
                       );
                     }
