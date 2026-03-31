@@ -1,6 +1,6 @@
 import { createAgentUIStreamResponse, ToolLoopAgent } from 'ai';
 import { philosopherAgent } from '@/agents/philosopher';
-import { journalAgent } from '@/agents/journal';
+import { createJournalAgent } from '@/agents/journal';
 import { orchestratorAgent } from '@/agents/orchestrator';
 
 export const maxDuration = 30;
@@ -14,7 +14,7 @@ export async function POST(req: Request) {
 
     switch (agentId) {
       case 'journal':
-        selectedAgent = journalAgent;
+        selectedAgent = createJournalAgent();
         break;
       case 'orchestrator':
         selectedAgent = orchestratorAgent;
