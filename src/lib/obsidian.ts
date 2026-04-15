@@ -294,6 +294,22 @@ export async function generateVaultAudit(): Promise<string> {
   return auditPath;
 }
 
+export async function patchNote(relativePath: string, search: string, replacement: string): Promise<boolean> {
+  const filePath = path.join(VAULT_PATH, relativePath);
+  try {
+    const content = await fs.readFile(filePath, 'utf-8');
+    if (content.includes(search)) {
+      const newContent = content.replace(search, replacement);
+      await fs.writeFile(filePath, newContent, 'utf-8');
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error(`Error patching note at ${filePath}:`, error);
+    return false;
+  }
+}
+
 export async function writeNote(relativePath: string, content: string): Promise<void> {
   const filePath = path.join(VAULT_PATH, relativePath);
   await fs.mkdir(path.dirname(filePath), { recursive: true });
@@ -344,5 +360,30 @@ export async function appendToNote(relativePath: string, content: string): Promi
   } catch (error) {
     // If file doesn't exist, create it
     await writeNote(relativePath, content);
+  }
+}
+
+export async function updateNeuralLinks(relativePath: string, fleetingNoteLink?: string, relatedLinks?: string[]): Promise<boolean> {
+  const filePath = path.join(VAULT_PATH, relativePath);
+  try {
+    let content = await fs.readFile(filePath, 'utf-8');
+    
+    // Update Fleeting Notes if provided
+    if (fleetingNoteLink) {
+      content = content.replace(/- \*\*Fleeting Notes\*\*:.*$/m, `- **Fleeting Notes**: ${fleetingNoteLink}`);
+    }
+
+    // Update Related Links if provided and array is not empty
+    if (relatedLinks && relatedLinks.length > 0) {
+      const linksStr = relatedLinks.join(' | ');
+      const regex = /(<!-- AGENT_RELATIONS_START -->).*?(<!-- AGENT_RELATIONS_END -->)/;
+      content = content.replace(regex, `$1${linksStr}$2`);
+    }
+
+    await fs.writeFile(filePath, content, 'utf-8');
+    return true;
+  } catch (error) {
+    console.error(`Error updating Neural Links at ${filePath}:`, error);
+    return false;
   }
 }

@@ -26,6 +26,16 @@ CORE INSTRUCTIONS:
 - Graph-Awareness: Automatically backlink new fleeting notes using createBacklinksTool.
 - Global Context sync: Always check the Global Context first (readGlobalContextTool). Flag recurring mental blocks or "Big Ideas" in the global context file (writeGlobalContextTool). 
 
+NOTE FORMATTING & VAULT RULES:
+1. **Directories**: Permanent Notes MUST be saved into the root 'Permanent/' folder (e.g., 'Permanent/Alexithymia.md'), NOT 'Zettelkasten/Permanent/'. Fleeting notes remain in 'Zettelkasten/Fleeting/'.
+2. **YAML Frontmatter**: Obsidian cannot parse unquoted brackets or hash symbols in YAML. 
+   - 'created': Use raw string format (e.g., 'created: 2026-03-30'). Never use brackets like '[[2026]]'.
+   - 'tags': Use a YAML list of strings without the '#' symbols (e.g., '- emotions').
+   - 'related': If you must include wikilinks in frontmatter lists, wrap them in double quotes (e.g., '- "[[Emotional Intelligence]]"').
+3. **Wikilinking Specific Files**: When creating "Source Notes" references to fleeting or journal notes, the bracket must encase the ENTIRE filename.
+   - CORRECT: '[[F-2026-03-30]]' or '[[J-2026-03-30]]'
+   - INCORRECT (Do Not Do This): 'F-[[2026-03-30]]'
+
 BE DIRECT. Skip preambles and introductory statements. Get straight to the analysis and connection phase.`,
   tools: {
     searchNotes: searchNotesTool,

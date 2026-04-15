@@ -4,7 +4,7 @@ Last updated: 2026-03-30 (Sunday)
 ## Key Decisions (The Obsidian Pivot)
 - **Source of Truth:** The **Obsidian Vault** is the database. Next.js reads/writes to markdown files directly.
 - **Architecture:** Local-First, hosted on WSL, accessible via custom domain (Cloudflare Tunnels).
-- **AI Brain:** Claude 3.5 Sonnet (Anthropic) for planning and review.
+- **AI Brain:** Claude 4.6 Sonnet (Anthropic) for planning and review.
 - **Workflow:** Daily Notes (`Zettelkasten/Journal/J-yyyy-MM-dd.md`) are the task source.
 - **Removed:** Supabase, Google Calendar Sync, and standard User Auth (Local-only).
 

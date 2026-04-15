@@ -4,7 +4,7 @@ Last updated: 2026-03-28 (Saturday)
 ## Key Decisions (The Obsidian Pivot)
 - **Source of Truth:** The **Obsidian Vault** is the database. Next.js reads and writes directly to markdown files via Node.js `fs`.
 - **Hosting:** The app is **Local-First**, hosted on the user's WSL machine, but accessible via a custom domain (Cloudflare Tunnels).
-- **AI Brain:** **Claude 3.5 Sonnet** (Anthropic) is the primary engine for planning, review, and vault manipulation.
+- **AI Brain:** **Claude 4.5 Sonnet** (Anthropic) is the primary engine for planning, review, and vault manipulation.
 - **Data Model:** 
     - Daily Notes: `Zettelkasten/Journal/J-yyyy-MM-dd.md`
     - Tasks: Bullet points `- [ ]` within daily notes.

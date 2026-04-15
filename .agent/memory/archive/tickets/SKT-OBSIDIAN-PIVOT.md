@@ -12,7 +12,7 @@
 ## Decisions Made
 - **Vault Access:** Use WSL file system access to directly read/write markdown notes.
 - **Data Model:** Daily Notes (`Zettelkasten/Journal`) are the primary task source.
-- **AI Integration:** Use Anthropic (Claude 3.5 Sonnet) as the planning brain.
+- **AI Integration:** Use Anthropic (Claude 4.6 Sonnet) as the planning brain.
 - **Hosting:** Host locally on WSL, accessible via Cloudflare Tunnels for the custom domain.
 - **Auth:** Remove user-level auth since this is a personal-use local application.
 

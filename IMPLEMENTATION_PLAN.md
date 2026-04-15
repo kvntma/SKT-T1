@@ -8,7 +8,7 @@
 |-------|------------|
 | Framework | Next.js 15 (App Router) - Hosted Locally |
 | Database | Obsidian Vault (Markdown Files) |
-| AI | Anthropic (Claude 3.5 Sonnet) via Vercel AI SDK |
+| AI | Anthropic (Claude 4.5 Sonnet) via Vercel AI SDK |
 | Sync | Obsidian Sync (Cross-device) |
 | Styling | Tailwind CSS + ShadCN/ui |
 | State | Zustand + React Query |

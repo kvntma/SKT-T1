@@ -10,7 +10,8 @@ import {
   batchAutoLink,
   getSmartConnections,
   listFiles,
-  listAllNoteTitles
+  listAllNoteTitles,
+  updateNeuralLinks
 } from '@/lib/obsidian';
 import { scheduleCalendarEvent } from '@/lib/calendar';
 import path from 'path';
@@ -176,6 +177,24 @@ export const patchJournalTool = tool({
   },
 });
 
+export const updateNeuralLinksTool = tool({
+  description: 'Safely and exactly updates the "Neural Links" list in a Daily Journal, mapping fleeting notes and related neural paths.',
+  inputSchema: jsonSchema({
+    type: 'object',
+    properties: {
+      targetPath: { type: 'string' },
+      fleetingNoteLink: { type: 'string', description: 'Like [[F-2026-03-30]], or empty string to ignore' },
+      relatedLinks: { type: 'array', items: { type: 'string' }, description: 'Array of WikiLinks like ["[[Push to Start]]", "[[JavaScript]]"]' }
+    },
+    required: ['targetPath'],
+  }),
+  execute: async ({ targetPath, fleetingNoteLink, relatedLinks }) => {
+    console.log(`[Tool] Updating Neural Links for: "${targetPath}"`);
+    const s = await updateNeuralLinks(targetPath as string, fleetingNoteLink as string | undefined, relatedLinks as string[] | undefined);
+    return s ? `Successfully updated Neural Links in ${targetPath}` : `Failed. Not a valid Journal or missing Neural Links section in ${targetPath}`;
+  },
+});
+
 // --- Orchestrator Specific Tools ---
 
 export const scheduleTaskTool = tool({
@@ -212,10 +231,22 @@ export const readGlobalContextTool = tool({
   }),
   execute: async () => {
     try {
+      const stat = await fs.stat(CONTEXT_PATH);
+      const isStale = Date.now() - stat.mtimeMs > 72 * 60 * 60 * 1000;
+      
+      if (isStale) {
+        console.log('[Tool] Global context is older than 72 hours. Auto-decaying back to baseline.');
+        return { bigIdeas: [], tacticalAdjustments: [], cognitiveLoad: "Normal", lastUpdated: "Fresh Start" };
+      }
+
       const data = await fs.readFile(CONTEXT_PATH, 'utf-8');
-      return JSON.parse(data);
+      const parsed = JSON.parse(data);
+      return { 
+        ...parsed, 
+        lastUpdated: new Date(stat.mtimeMs).toISOString() 
+      };
     } catch (e: any) {
-      if (e.code === 'ENOENT') return { bigIdeas: [], tacticalAdjustments: [], cognitiveLoad: "Normal" };
+      if (e.code === 'ENOENT') return { bigIdeas: [], tacticalAdjustments: [], cognitiveLoad: "Normal", lastUpdated: "Fresh Start" };
       throw e;
     }
   }

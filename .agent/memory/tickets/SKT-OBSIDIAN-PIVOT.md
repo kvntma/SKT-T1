@@ -10,6 +10,7 @@
 - [x] Integrate Smart Connections bridge for local semantic search.
 - [x] Integrate detailed `Journal.md` template support.
 - [x] Fix UI bug: React console error on Input components.
+- [x] Successfully implemented and debugged Vercel AI SDK (Anthropic) for conversational planning, integrating Obsidian tools (`searchNotes`, `readNote`, `getNearbyNotes`) and resolving SDK v6.x incompatibilities.
 
 ## Key Decisions
 - **Obsidian is the Database**: All state resides in markdown files.

@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
-import { Folder, Save, Info, ExternalLink } from 'lucide-react'
+import { Folder, Save, Info, ExternalLink, Calendar, CheckCircle2 } from 'lucide-react'
 
 export default function SettingsPage() {
     const router = useRouter()
@@ -15,6 +15,21 @@ export default function SettingsPage() {
     // TODO: Wire up useObsidianConfig hook
     const [vaultPath, setVaultPath] = useState('/path/to/your/obsidian/vault')
     const [isSaving, setIsSaving] = useState(false)
+    const [isCalendarConnected, setIsCalendarConnected] = useState(false)
+
+    useEffect(() => {
+        // Simple check for token file presence (via a hypothetical API)
+        const checkAuth = async () => {
+            try {
+                const res = await fetch('/api/auth/google/status')
+                const data = await res.json()
+                setIsCalendarConnected(data.connected)
+            } catch (e) {
+                console.error('Failed to check calendar status')
+            }
+        }
+        checkAuth()
+    }, [])
 
     const handleSaveVault = () => {
         setIsSaving(true)
@@ -23,6 +38,10 @@ export default function SettingsPage() {
             setIsSaving(false)
             alert('Vault configuration updated!')
         }, 500)
+    }
+
+    const handleConnectGoogle = () => {
+        window.location.href = '/api/auth/google'
     }
 
     return (
@@ -43,7 +62,7 @@ export default function SettingsPage() {
                             Back
                         </Button>
                     </div>
-                    <h1 className="text-2xl font-bold text-white">Settings</h1>
+                    <h1 className="text-2xl font-bold text-white uppercase tracking-tight font-mono">System Config</h1>
                     <div className="w-16" /> {/* Spacer for centering */}
                 </div>
 
@@ -72,13 +91,13 @@ export default function SettingsPage() {
                                     <Button 
                                         onClick={handleSaveVault}
                                         disabled={isSaving}
-                                        className="bg-emerald-600 hover:bg-emerald-500"
+                                        className="bg-emerald-600 hover:bg-emerald-500 shadow-lg shadow-emerald-500/10"
                                     >
                                         {isSaving ? 'Saving...' : <Save className="h-4 w-4" />}
                                     </Button>
                                 </div>
-                                <p className="text-[10px] text-zinc-500">
-                                    This path must be accessible by the local Node.js server.
+                                <p className="text-[10px] text-zinc-500 font-mono">
+                                    Root: {vaultPath}
                                 </p>
                             </div>
 
@@ -87,13 +106,64 @@ export default function SettingsPage() {
                                     <Info className="h-4 w-4 text-blue-400 shrink-0 mt-0.5" />
                                     <div className="space-y-1">
                                         <p className="text-xs font-medium text-blue-300">Daily Notes Required</p>
-                                        <p className="text-[10px] text-blue-400/80 leading-relaxed">
-                                            The app looks for daily notes in your vault using the `J-yyyy-MM-dd.md` format. 
-                                            Ensure your Templater or Daily Notes plugin matches this format.
+                                        <p className="text-[10px] text-blue-400/80 leading-relaxed font-mono">
+                                            Path: Zettelkasten/Journal/J-yyyy-MM-dd.md
                                         </p>
                                     </div>
                                 </div>
                             </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* Google Calendar Integration */}
+                    <Card className="border-zinc-800 bg-zinc-900/80 backdrop-blur-xl">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-lg">
+                                <span>📅</span> Google Calendar
+                            </CardTitle>
+                            <CardDescription>Authorize Time-to-Start to push execution blocks</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="flex items-center justify-between p-4 rounded-xl bg-zinc-950 border border-zinc-800 shadow-inner">
+                                <div className="flex items-center gap-3">
+                                    <div className={cn(
+                                        "w-10 h-10 rounded-lg flex items-center justify-center border",
+                                        isCalendarConnected ? "bg-emerald-500/10 border-emerald-500/20" : "bg-zinc-800 border-zinc-700"
+                                    )}>
+                                        <Calendar className={cn("w-5 h-5", isCalendarConnected ? "text-emerald-500" : "text-zinc-500")} />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-bold text-white">Google Account</p>
+                                        <p className="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">
+                                            {isCalendarConnected ? 'Authorized & Connected' : 'No account linked'}
+                                        </p>
+                                    </div>
+                                </div>
+                                <Button
+                                    variant={isCalendarConnected ? "outline" : "default"}
+                                    size="sm"
+                                    onClick={handleConnectGoogle}
+                                    className={cn(
+                                        "text-xs gap-2 font-bold uppercase tracking-tight",
+                                        isCalendarConnected ? "border-zinc-800 text-zinc-400" : "bg-blue-600 hover:bg-blue-500"
+                                    )}
+                                >
+                                    {isCalendarConnected ? (
+                                        <>
+                                            <CheckCircle2 className="w-3.5 h-3.5" />
+                                            Re-link
+                                        </>
+                                    ) : (
+                                        <>
+                                            <ExternalLink className="w-3.5 h-3.5" />
+                                            Connect
+                                        </>
+                                    )}
+                                </Button>
+                            </div>
+                            <p className="mt-3 text-[9px] text-zinc-600 text-center font-mono">
+                                FlowSavvy automatically reads your primary Google Calendar as the source of truth.
+                            </p>
                         </CardContent>
                     </Card>
 

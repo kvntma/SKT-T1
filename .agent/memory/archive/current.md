@@ -8,7 +8,7 @@
 ## Context
 - The user decided to move away from a cloud-based Supabase model and instead use their local **Obsidian Vault** as the primary database.
 - The app now acts as a "focused lens" and execution layer for the vault.
-- A conversational AI (Claude 3.5 Sonnet) is integrated into the app to help with daily planning and review by reading and writing markdown notes.
+- A conversational AI (Claude 4.5 Sonnet) is integrated into the app to help with daily planning and review by reading and writing markdown notes.
 
 ## Next Steps
 1. [ ] **Finalize Task Write-back**: Update the `/now` screen's "Done" handler to call an API that actually marks the task as `[x]` in the Obsidian note (not just a mock).
